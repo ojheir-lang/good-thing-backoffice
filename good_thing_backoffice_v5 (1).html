@@ -1,0 +1,2754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Good Thing — Back Office</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #FAFAF8;
+    --panel: #FFFFFF;
+    --panel2: #F5F3EF;
+    --accent: #C0392B;
+    --dark: #1A1814;
+    --muted: #9A9690;
+    --border: #E8E4DC;
+    --radius: 6px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--dark); font-family:'Jost',sans-serif; font-weight:300; min-height:100vh; }
+
+  /* ── LOCK ── */
+  #lock {
+    position:fixed; inset:0; background:#0D0C08; z-index:9999;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:28px;
+  }
+  #lock-bar { width:40px; height:2px; background:var(--accent); }
+  #lock h1 { font-family:'Cormorant Garamond',serif; font-size:clamp(2.8rem,6vw,5rem); font-weight:300; color:#F0EBE1; letter-spacing:0.04em; }
+  #lock h1 em { color:var(--accent); font-style:italic; }
+  #lock p { font-size:0.68rem; letter-spacing:0.22em; text-transform:uppercase; color:rgba(240,235,225,0.4); }
+  #lock-input {
+    background:transparent; border:none; border-bottom:1px solid rgba(240,235,225,0.2);
+    color:#F0EBE1; font-family:'Jost',sans-serif; font-size:1rem; font-weight:300;
+    padding:10px 0; width:260px; text-align:center; letter-spacing:0.15em; outline:none;
+    transition:border-color 0.2s;
+  }
+  #lock-input:focus { border-color:var(--accent); }
+  #lock-input::placeholder { color:rgba(240,235,225,0.3); }
+  #lock-username::placeholder { color:rgba(240,235,225,0.3); }
+  #lock-btn {
+    background:var(--accent); color:#F0EBE1; border:none; cursor:pointer;
+    font-family:'Jost',sans-serif; font-size:0.68rem; font-weight:400; letter-spacing:0.22em;
+    text-transform:uppercase; padding:13px 44px; border-radius:2px; transition:opacity 0.2s;
+  }
+  #lock-btn:hover { opacity:0.85; }
+  #lock-err { color:var(--accent); font-size:0.72rem; letter-spacing:0.08em; min-height:14px; }
+
+  /* ── APP ── */
+  #app { display:none; }
+
+  /* ── HEADER ── */
+  header {
+    background:var(--panel); border-bottom:1px solid var(--border);
+    padding:0 28px; display:flex; align-items:center; justify-content:space-between;
+    height:54px; position:sticky; top:0; z-index:100;
+    box-shadow:0 1px 4px rgba(0,0,0,0.04);
+  }
+  .logo { font-family:'Cormorant Garamond',serif; font-size:1.25rem; font-weight:300; letter-spacing:0.05em; }
+  .logo em { color:var(--accent); font-style:italic; }
+  .header-date { font-size:0.62rem; letter-spacing:0.16em; text-transform:uppercase; color:var(--muted); }
+  .sync-badge { font-size:0.6rem; letter-spacing:0.08em; text-transform:uppercase; color:var(--muted); }
+  .sync-badge.syncing { color:var(--accent); animation:pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} }
+
+  /* ── LAYOUT ── */
+  .layout { display:flex; min-height:calc(100vh - 54px); }
+
+  /* ── SIDENAV ── */
+  nav {
+    width:210px; background:var(--panel); border-right:1px solid var(--border);
+    padding:20px 0; flex-shrink:0; position:sticky; top:54px; height:calc(100vh - 54px);
+    overflow-y:auto;
+  }
+  .nav-sec { padding:4px 18px 6px; font-size:0.58rem; letter-spacing:0.24em; text-transform:uppercase; color:var(--muted); margin-top:14px; }
+  .nav-item {
+    display:flex; align-items:center; gap:9px; padding:9px 20px;
+    cursor:pointer; font-size:0.76rem; letter-spacing:0.05em; color:var(--muted);
+    transition:all 0.14s; border-left:2px solid transparent;
+  }
+  .nav-item:hover { color:var(--dark); background:var(--panel2); }
+  .nav-item.active { color:var(--dark); border-left-color:var(--accent); background:rgba(192,57,43,0.06); font-weight:400; }
+  .nav-icon { font-size:0.9rem; width:16px; text-align:center; }
+
+  /* ── MAIN ── */
+  main { flex:1; padding:32px 36px; overflow-x:hidden; }
+  .page { display:none; animation:fadeIn 0.18s ease; }
+  .page.active { display:block; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+
+  /* ── PAGE HEADER ── */
+  .ph { margin-bottom:28px; }
+  .ph h2 { font-family:'Cormorant Garamond',serif; font-size:1.9rem; font-weight:300; }
+  .ph-line { width:28px; height:2px; background:var(--accent); margin:8px 0 6px; }
+  .ph p { font-size:0.68rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); }
+
+  /* ── CARD ── */
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:22px; }
+  .card-t { font-size:0.62rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--muted); margin-bottom:14px; }
+
+  /* ── BUTTONS ── */
+  .btn {
+    display:inline-flex; align-items:center; gap:6px; cursor:pointer; border:none;
+    font-family:'Jost',sans-serif; font-size:0.67rem; font-weight:400; letter-spacing:0.16em;
+    text-transform:uppercase; padding:9px 18px; border-radius:2px; transition:all 0.14s;
+  }
+  .btn-p { background:var(--accent); color:#fff; }
+  .btn-p:hover { background:#a93226; }
+  .btn-o { background:transparent; color:var(--dark); border:1px solid var(--border); }
+  .btn-o:hover { border-color:var(--dark); }
+  .btn-wa { background:#25D366; color:#fff; }
+  .btn-wa:hover { background:#1ebe5d; }
+  .btn-sm { padding:6px 13px; font-size:0.62rem; }
+  .btn-xs { padding:4px 9px; font-size:0.6rem; }
+  .btn-loading { opacity:0.6; pointer-events:none; }
+
+  /* ── INPUTS ── */
+  .fg { margin-bottom:14px; }
+  label { display:block; font-size:0.62rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); margin-bottom:5px; }
+  input[type=text],input[type=number],input[type=date],input[type=password],select,textarea {
+    width:100%; background:#fff; border:1px solid var(--border); color:var(--dark);
+    font-family:'Jost',sans-serif; font-size:0.83rem; font-weight:300;
+    padding:9px 12px; border-radius:var(--radius); outline:none; transition:border-color 0.14s;
+    -webkit-appearance:none;
+  }
+  input:focus,select:focus,textarea:focus { border-color:var(--accent); }
+  select option { background:#fff; }
+  input[type=checkbox] { width:15px; height:15px; accent-color:var(--accent); cursor:pointer; flex-shrink:0; margin-top:2px; }
+
+  /* ── TABS ── */
+  .tabs { display:flex; border-bottom:1px solid var(--border); margin-bottom:20px; flex-wrap:wrap; gap:0; overflow-x:auto; }
+  .tab {
+    padding:9px 18px; font-size:0.67rem; letter-spacing:0.1em; text-transform:uppercase;
+    cursor:pointer; color:var(--muted); border-bottom:2px solid transparent; white-space:nowrap;
+    transition:all 0.14s; margin-bottom:-1px; background:none; border-top:none; border-left:none; border-right:none;
+  }
+  .tab:hover { color:var(--dark); }
+  .tab.active { color:var(--accent); border-bottom-color:var(--accent); font-weight:400; }
+
+  /* ── TABLE ── */
+  .tbl-wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:0.81rem; }
+  thead tr { border-bottom:2px solid var(--border); }
+  th { text-align:left; padding:9px 12px; font-size:0.6rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--muted); font-weight:400; }
+  td { padding:8px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  tr:last-child td { border-bottom:none; }
+  tbody tr:hover td { background:var(--panel2); }
+  .qty-inp { width:72px; text-align:center; padding:5px 8px; font-size:0.8rem; }
+
+  /* ── CHECKLIST ── */
+  .cl-item {
+    display:flex; align-items:flex-start; gap:11px; padding:9px 0;
+    border-bottom:1px solid var(--border); font-size:0.81rem; line-height:1.5;
+  }
+  .cl-item:last-child { border-bottom:none; }
+  .cl-label { flex:1; cursor:pointer; user-select:none; }
+  .cl-label.done { text-decoration:line-through; color:var(--muted); }
+  .freq-tag {
+    font-size:0.58rem; letter-spacing:0.1em; text-transform:uppercase;
+    padding:2px 8px; border-radius:20px; background:var(--panel2);
+    color:var(--muted); white-space:nowrap; align-self:center; flex-shrink:0;
+  }
+  .cl-section { font-size:0.62rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--accent); padding:14px 0 7px; font-weight:400; border-top:1px solid var(--border); margin-top:4px; }
+  .cl-section:first-child { border-top:none; margin-top:0; padding-top:0; }
+
+  /* ── WASTAGE ── */
+  .ws-row { display:grid; grid-template-columns:2fr 90px 80px 2fr 36px; gap:8px; margin-bottom:8px; align-items:center; }
+
+  /* ── TIPS ── */
+  .tips-result { font-family:'Cormorant Garamond',serif; font-size:1.05rem; color:var(--accent); font-weight:400; }
+
+  /* ── GRID ── */
+  .g2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px; }
+  .g3 { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; }
+  .g4 { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; }
+
+  /* ── STAT ── */
+  .stat-v { font-family:'Cormorant Garamond',serif; font-size:2rem; font-weight:300; }
+  .stat-l { font-size:0.6rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--muted); margin-top:2px; }
+
+  /* ── MODAL ── */
+  .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,0.35); z-index:500; display:none; align-items:center; justify-content:center; padding:20px; }
+  .modal-bg.open { display:flex; }
+  .modal {
+    background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+    padding:28px; max-width:520px; width:100%; max-height:85vh; overflow-y:auto; position:relative;
+    box-shadow:0 8px 40px rgba(0,0,0,0.12);
+  }
+  .modal h3 { font-family:'Cormorant Garamond',serif; font-size:1.5rem; font-weight:300; margin-bottom:18px; }
+  .modal-x { position:absolute; top:14px; right:16px; background:none; border:none; color:var(--muted); cursor:pointer; font-size:1.1rem; padding:4px; }
+
+  /* ── SUPPLIER BADGE ── */
+  .sup-badge { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:20px; font-size:0.62rem; letter-spacing:0.1em; background:rgba(192,57,43,0.08); color:var(--accent); }
+
+  /* ── TOAST ── */
+  #toast {
+    position:fixed; bottom:24px; right:24px; background:var(--dark); color:#fff;
+    border-left:3px solid var(--accent); padding:12px 18px; font-size:0.76rem;
+    letter-spacing:0.04em; border-radius:var(--radius); z-index:9000;
+    transform:translateY(60px); opacity:0; transition:all 0.25s; pointer-events:none;
+  }
+  #toast.show { transform:translateY(0); opacity:1; }
+
+  /* ── HISTORY PAGE ── */
+  .history-controls { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:18px; }
+  .history-controls .fg { margin:0; flex:1; min-width:160px; }
+  .history-empty { font-size:0.82rem; color:var(--muted); padding:40px 20px; text-align:center; }
+  .history-section { margin-bottom:24px; }
+  .history-section h3 { font-family:'Cormorant Garamond',serif; font-size:1.3rem; font-weight:300; margin-bottom:14px; color:var(--dark); padding-bottom:8px; border-bottom:1px solid var(--border); }
+
+  @media(max-width:820px){ nav{display:none;} main{padding:16px;} }
+  @media print {
+    #lock,nav,header,.btn,#toast{display:none!important;}
+    main{padding:0;} .page{display:block!important;}
+  }
+  /* Sales tabs */
+  .sales-tab { display:none; }
+  .sales-tab.active { display:block; }
+  #sales-tab-overview.active, #sales-tab-daily.active, #sales-tab-monthly.active { display:block; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- LOCK -->
+<div id="lock">
+  <div id="lock-bar"></div>
+  <h1>Good <em>Thing</em></h1>
+  <p>Back Office System</p>
+  <input id="lock-username" type="text" placeholder="Username" autocomplete="off" style="background:transparent;border:none;border-bottom:1px solid rgba(240,235,225,0.2);color:#F0EBE1;font-family:'Jost',sans-serif;font-size:1rem;font-weight:300;padding:10px 0;width:260px;text-align:center;letter-spacing:0.15em;outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='rgba(240,235,225,0.2)'" onkeydown="if(event.key==='Enter')document.getElementById('lock-input').focus()">
+  <input id="lock-input" type="password" placeholder="Password" autocomplete="off">
+  <div id="lock-err"></div>
+  <button id="lock-btn" class="btn-p" style="font-family:'Jost',sans-serif;font-size:0.68rem;font-weight:400;letter-spacing:0.22em;text-transform:uppercase;padding:13px 44px;border-radius:2px;border:none;cursor:pointer;background:var(--accent);color:#fff;" onclick="unlock()">Enter</button>
+</div>
+
+<!-- DAY CLOSE MODAL (manager only) -->
+<div class="modal-bg" id="close-day-modal">
+  <div class="modal">
+    <h3>Close the Day</h3>
+    <p style="font-size:0.82rem;color:var(--muted);line-height:1.8;margin-bottom:18px;">This will archive today's data to the cloud and <strong style="color:var(--dark);">reset all checklists, wastage, and requisition quantities</strong> for the next service day. This action cannot be undone.</p>
+    <div style="background:rgba(192,57,43,0.06);border:1px solid rgba(192,57,43,0.18);border-radius:var(--radius);padding:14px;margin-bottom:20px;font-size:0.78rem;color:var(--dark);line-height:1.75;">
+      ⚠ Please confirm that all data has been reviewed before closing the day.
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn btn-o" onclick="document.getElementById('close-day-modal').classList.remove('open')">Cancel</button>
+      <button class="btn btn-p" onclick="confirmCloseDay()">✓ Confirm & Close Day</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <header>
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div class="logo">Good <em>Thing</em></div>
+      <div style="display:flex;gap:4px;">
+        <button id="nav-back-btn" onclick="navBack()" title="Go back" style="background:none;border:1px solid var(--border);border-radius:var(--radius);color:var(--muted);cursor:pointer;font-size:0.85rem;width:28px;height:28px;display:flex;align-items:center;justify-content:center;transition:all 0.14s;opacity:0.35;" disabled>&#8592;</button>
+        <button id="nav-fwd-btn"  onclick="navForward()" title="Go forward" style="background:none;border:1px solid var(--border);border-radius:var(--radius);color:var(--muted);cursor:pointer;font-size:0.85rem;width:28px;height:28px;display:flex;align-items:center;justify-content:center;transition:all 0.14s;opacity:0.35;" disabled>&#8594;</button>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;">
+      <div class="sync-badge" id="sync-badge">⊙ Cloud Ready</div>
+      <div class="header-date" id="hdate"></div>
+      <div id="header-user" style="font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:10px;">
+        <span id="header-username"></span>
+        <button id="close-day-btn" onclick="openCloseDay()" style="display:none;background:rgba(192,57,43,0.12);color:var(--accent);border:1px solid rgba(192,57,43,0.3);font-family:'Jost',sans-serif;font-size:0.58rem;letter-spacing:0.14em;text-transform:uppercase;padding:5px 12px;border-radius:2px;cursor:pointer;">⬡ Close Day</button>
+        <button onclick="logout()" style="background:none;border:none;font-family:'Jost',sans-serif;font-size:0.58rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);cursor:pointer;padding:4px 0;">Sign Out</button>
+      </div>
+    </div>
+  </header>
+  <div class="layout">
+    <nav>
+      <div class="nav-sec">Operations</div>
+      <div class="nav-item active" onclick="showPage('dashboard',this)"><span class="nav-icon">◈</span>Dashboard</div>
+      <div class="nav-sec">Checklists</div>
+      <div class="nav-item" onclick="showPage('foh-open',this)"><span class="nav-icon">↑</span>FOH Opening</div>
+      <div class="nav-item" onclick="showPage('foh-close',this)"><span class="nav-icon">↓</span>FOH Closing</div>
+      <div class="nav-item" onclick="showPage('bar-open',this)"><span class="nav-icon">↑</span>Bar Opening</div>
+      <div class="nav-item" onclick="showPage('bar-close',this)"><span class="nav-icon">↓</span>Bar Closing</div>
+      <div class="nav-item" onclick="showPage('foh-clean',this)"><span class="nav-icon">◌</span>FOH Cleaning</div>
+      <div class="nav-sec">Procurement</div>
+      <div class="nav-item" onclick="showSupplier('consumables',this)"><span class="nav-icon">◎</span>Consumables</div>
+      <div class="nav-item" onclick="showSupplier('kitchen',this)"><span class="nav-icon">◎</span>Kitchen</div>
+      <div class="nav-item" onclick="showSupplier('golden',this)"><span class="nav-icon">◎</span>Golden Food</div>
+      <div class="nav-item" onclick="showSupplier('eba',this)"><span class="nav-icon">◎</span>EBA</div>
+      <div class="nav-item" onclick="showSupplier('eam',this)"><span class="nav-icon">◎</span>EAM (Wine)</div>
+      <div class="nav-sec">Reporting</div>
+      <div class="nav-item" onclick="showPage('wastage',this)"><span class="nav-icon">△</span>Wastage</div>
+      <div class="nav-item" onclick="showPage('tips',this)"><span class="nav-icon">◇</span>Tips Division</div>
+      <div class="nav-sec" id="nav-sec-sales" style="display:none;">Sales</div>
+      <div class="nav-item" id="nav-item-sales" onclick="showPage('sales',this)" style="display:none;"><span class="nav-icon">◆</span>Daily Sales</div>
+      <div class="nav-sec">Records</div>
+      <div class="nav-item" onclick="showPage('history',this)"><span class="nav-icon">◈</span>History</div>
+      <div class="nav-sec" id="nav-sec-manager" style="display:none;">Manager</div>
+      <div class="nav-item" id="nav-item-users" onclick="showPage('users',this)" style="display:none;"><span class="nav-icon">◉</span>Users & Access</div>
+    </nav>
+
+    <main>
+
+      <!-- DASHBOARD -->
+      <div class="page active" id="page-dashboard">
+        <div class="ph"><h2>Dashboard</h2><div class="ph-line"></div><p id="dash-welcome">Good Thing — Daily Overview</p></div>
+        <div class="g4" style="margin-bottom:20px;">
+          <div class="card"><div class="stat-v" id="d-foh-open">0%</div><div class="stat-l">FOH Opening Done</div></div>
+          <div class="card"><div class="stat-v" id="d-foh-close">0%</div><div class="stat-l">FOH Closing Done</div></div>
+          <div class="card"><div class="stat-v" id="d-bar-open">0%</div><div class="stat-l">Bar Opening Done</div></div>
+          <div class="card"><div class="stat-v" id="d-wastage">0</div><div class="stat-l">Wastage Entries</div></div>
+        </div>
+        <div class="g2">
+          <div class="card">
+            <div class="card-t">Quick Access</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <button class="btn btn-o" onclick="showPageById('foh-open')">→ FOH Opening Checklist</button>
+              <button class="btn btn-o" onclick="showPageById('bar-open')">→ Bar Opening Checklist</button>
+              <button class="btn btn-o" onclick="showSupplier('consumables',null)">→ Requisition</button>
+              <button class="btn btn-o" onclick="showPageById('wastage')">→ Log Wastage</button>
+              <button class="btn btn-o" id="dash-tips-btn" onclick="showPage('tips',null)">→ Divide Tips</button>
+              <button class="btn btn-o" id="dash-sales-btn" onclick="showPage('sales',null)" style="display:none;">→ Daily Sales</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-t">Info</div>
+            <p style="font-size:0.8rem;color:var(--muted);line-height:1.9;">
+              All data saves in your browser automatically.<br>
+              <span id="cloud-info-text">Data also syncs to cloud when configured.</span><br>
+              Requisitions send directly to each supplier via WhatsApp.<br>
+              Supplier names are stored per category.<br>
+              Checklists track daily progress per shift.
+            </p>
+            <div id="dash-db-setup-wrap" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
+              <p style="font-size:0.72rem;color:var(--accent);margin-bottom:8px;letter-spacing:0.04em;">First time? Set up your cloud database:</p>
+              <button class="btn btn-p btn-sm" onclick="showPage('users',null)">⚙ Setup Database Tables →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FOH OPENING -->
+      <div class="page" id="page-foh-open">
+        <div class="ph"><h2>FOH Opening</h2><div class="ph-line"></div><p>Waiter / MOD — Daily Checklist</p></div>
+        <div class="card" style="margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px;">
+            <div class="card-t" style="margin:0;">Floor — Opening Checklist</div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-o btn-sm" onclick="chkAll('foh-open',true)">Check All</button>
+              <button class="btn btn-o btn-sm" onclick="chkAll('foh-open',false)">Reset</button>
+            </div>
+          </div>
+          <div id="cl-foh-open"></div>
+          <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="text" id="add-task-foh-open" placeholder="Add a custom task…" style="flex:1;" onkeydown="if(event.key==='Enter')addCustomTask('foh-open')">
+              <button class="btn btn-o btn-sm" onclick="addCustomTask('foh-open')">+ Add Task</button>
+            </div>
+          </div>
+          <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+            <p style="font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent);margin-bottom:12px;">⚠ Waiter &amp; Manager in charge will be held accountable for any missed tasks</p>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;">
+              <div class="fg" style="margin:0;flex:1;min-width:160px;"><label>Waiter in Charge</label><input type="text" id="foh-open-waiter" placeholder="Name"></div>
+              <div class="fg" style="margin:0;flex:1;min-width:160px;"><label>Manager in Charge</label><input type="text" id="foh-open-manager" placeholder="Name"></div>
+              <div class="fg" style="margin:0;width:150px;"><label>Date</label><input type="date" id="foh-open-date"></div>
+            </div>
+          </div>
+        </div>
+        <div style="text-align:right;font-size:0.72rem;color:var(--muted);" id="prog-foh-open"></div>
+      </div>
+
+      <!-- FOH CLOSING -->
+      <div class="page" id="page-foh-close">
+        <div class="ph"><h2>FOH Closing</h2><div class="ph-line"></div><p>Waiter / MOD — Daily Checklist</p></div>
+        <div class="card" style="margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px;">
+            <div class="card-t" style="margin:0;">Floor — Closing Checklist</div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-o btn-sm" onclick="chkAll('foh-close',true)">Check All</button>
+              <button class="btn btn-o btn-sm" onclick="chkAll('foh-close',false)">Reset</button>
+            </div>
+          </div>
+          <div id="cl-foh-close"></div>
+          <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="text" id="add-task-foh-close" placeholder="Add a custom task…" style="flex:1;" onkeydown="if(event.key==='Enter')addCustomTask('foh-close')">
+              <button class="btn btn-o btn-sm" onclick="addCustomTask('foh-close')">+ Add Task</button>
+            </div>
+          </div>
+          <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+            <p style="font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent);margin-bottom:12px;">⚠ Waiter &amp; Manager in charge will be held accountable for any missed tasks</p>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;">
+              <div class="fg" style="margin:0;flex:1;min-width:160px;"><label>Waiter in Charge</label><input type="text" id="foh-close-waiter" placeholder="Name"></div>
+              <div class="fg" style="margin:0;flex:1;min-width:160px;"><label>Manager in Charge</label><input type="text" id="foh-close-manager" placeholder="Name"></div>
+              <div class="fg" style="margin:0;width:150px;"><label>Date</label><input type="date" id="foh-close-date"></div>
+            </div>
+          </div>
+        </div>
+        <div style="text-align:right;font-size:0.72rem;color:var(--muted);" id="prog-foh-close"></div>
+      </div>
+
+      <!-- BAR OPENING -->
+      <div class="page" id="page-bar-open">
+        <div class="ph"><h2>Bar Opening</h2><div class="ph-line"></div><p>Bartender — Daily Checklist</p></div>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px;">
+            <div class="card-t" style="margin:0;">Bar Opening Checklist</div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-o btn-sm" onclick="chkAll('bar-open',true)">Check All</button>
+              <button class="btn btn-o btn-sm" onclick="chkAll('bar-open',false)">Reset</button>
+            </div>
+          </div>
+          <div id="cl-bar-open"></div>
+          <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="text" id="add-task-bar-open" placeholder="Add a custom task…" style="flex:1;" onkeydown="if(event.key==='Enter')addCustomTask('bar-open')">
+              <button class="btn btn-o btn-sm" onclick="addCustomTask('bar-open')">+ Add Task</button>
+            </div>
+          </div>
+        </div>
+        <div style="text-align:right;font-size:0.72rem;color:var(--muted);margin-top:8px;" id="prog-bar-open"></div>
+      </div>
+
+      <!-- BAR CLOSING -->
+      <div class="page" id="page-bar-close">
+        <div class="ph"><h2>Bar Closing</h2><div class="ph-line"></div><p>Bartender — Daily Checklist</p></div>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px;">
+            <div class="card-t" style="margin:0;">Bar Closing Checklist</div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-o btn-sm" onclick="chkAll('bar-close',true)">Check All</button>
+              <button class="btn btn-o btn-sm" onclick="chkAll('bar-close',false)">Reset</button>
+            </div>
+          </div>
+          <div id="cl-bar-close"></div>
+          <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="text" id="add-task-bar-close" placeholder="Add a custom task…" style="flex:1;" onkeydown="if(event.key==='Enter')addCustomTask('bar-close')">
+              <button class="btn btn-o btn-sm" onclick="addCustomTask('bar-close')">+ Add Task</button>
+            </div>
+          </div>
+        </div>
+        <div style="text-align:right;font-size:0.72rem;color:var(--muted);margin-top:8px;" id="prog-bar-close"></div>
+      </div>
+
+      <!-- FOH CLEANING -->
+      <div class="page" id="page-foh-clean">
+        <div class="ph"><h2>FOH Cleaning</h2><div class="ph-line"></div><p>Wall Section · Front of House · Behind Bar</p></div>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px;">
+            <div class="card-t" style="margin:0;">FOH Cleaning Checklist</div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-o btn-sm" onclick="chkAll('foh-clean',true)">Check All</button>
+              <button class="btn btn-o btn-sm" onclick="chkAll('foh-clean',false)">Reset</button>
+            </div>
+          </div>
+          <div id="cl-foh-clean"></div>
+          <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="text" id="add-task-foh-clean" placeholder="Add a custom task…" style="flex:1;" onkeydown="if(event.key==='Enter')addCustomTask('foh-clean')">
+              <button class="btn btn-o btn-sm" onclick="addCustomTask('foh-clean')">+ Add Task</button>
+            </div>
+          </div>
+        </div>
+        <div style="text-align:right;font-size:0.72rem;color:var(--muted);margin-top:8px;" id="prog-foh-clean"></div>
+      </div>
+
+      <!-- REQUISITION -->
+      <div class="page" id="page-requisition">
+        <div class="ph"><h2 id="rq-page-title">Requisition</h2><div class="ph-line"></div><p id="rq-page-sub">Select a supplier from the left menu</p></div>
+        <div class="card" style="margin-bottom:18px;">
+          <div style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;">
+            <div class="fg" style="margin:0;flex:1;min-width:140px;"><label>Date</label><input type="date" id="req-date"></div>
+            <div class="fg" style="margin:0;flex:1;min-width:140px;"><label>Requested By</label><input type="text" id="req-by" placeholder="Your name"></div>
+            <button class="btn btn-o btn-sm" onclick="clearSupplierQtys()">Clear Quantities</button>
+          </div>
+        </div>
+
+        <!-- Supplier cards (one shown at a time) -->
+        <div id="rq-suppliers"></div>
+      </div>
+
+      <!-- WASTAGE -->
+      <div class="page" id="page-wastage">
+        <div class="ph"><h2>Wastage Log</h2><div class="ph-line"></div><p>Kitchen · Bar · Floor</p></div>
+        <div class="tabs">
+          <button class="tab active" onclick="swTab('ws','kitchen',this)">Kitchen</button>
+          <button class="tab" onclick="swTab('ws','bar',this)">Bar</button>
+          <button class="tab" onclick="swTab('ws','floor',this)">Floor</button>
+        </div>
+        <div id="ws-kitchen" class="ws-tab active"><div class="card" id="wsc-kitchen"></div></div>
+        <div id="ws-bar" class="ws-tab" style="display:none;"><div class="card" id="wsc-bar"></div></div>
+        <div id="ws-floor" class="ws-tab" style="display:none;"><div class="card" id="wsc-floor"></div></div>
+      </div>
+
+      <!-- TIPS -->
+      <div class="page" id="page-tips">
+        <div class="ph"><h2>Tips Division</h2><div class="ph-line"></div><p>FOH — Automatic split calculation</p></div>
+
+        <div class="tabs">
+          <button class="tab active" onclick="swTab('tips-tab','today',this)">Today</button>
+          <button class="tab" onclick="swTab('tips-tab','history',this);loadTipsHistory()">History</button>
+        </div>
+
+        <!-- TODAY -->
+        <div id="tips-tab-today" class="tips-tab">
+          <div class="g2" style="margin-bottom:18px;">
+            <div class="card">
+              <div class="card-t">Total Tips Pool ($)</div>
+              <input type="number" id="tips-pool" placeholder="0.00" oninput="calcTips()" style="font-size:1.1rem;">
+            </div>
+            <div class="card">
+              <div class="card-t">Date</div>
+              <input type="date" id="tips-date" onchange="loadTipsForDate(this.value)">
+            </div>
+          </div>
+          <div class="card" style="margin-bottom:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+              <div class="card-t" style="margin:0;">Staff</div>
+              <button class="btn btn-o btn-sm" onclick="addTipsRow()">+ Add Staff</button>
+            </div>
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr><th>Name</th><th>Position</th><th>Shares</th><th>Deduction ($)</th><th>Withdraw ($)</th><th>Total ($)</th><th></th></tr></thead>
+                <tbody id="tips-body"></tbody>
+              </table>
+            </div>
+            <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+              <span style="font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Total Shares: <strong id="ts-total" style="color:var(--dark);">0</strong></span>
+              <span style="font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Per Share: <span id="ts-perval" style="color:var(--accent);font-family:'Cormorant Garamond',serif;font-size:1.1rem;font-weight:400;">$0.00</span></span>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:10px;">
+            <button class="btn btn-o" onclick="window.print()">Print</button>
+            <button class="btn btn-p" onclick="saveTipsDay()">💾 Save Day</button>
+          </div>
+          <div id="tips-save-status" style="text-align:right;margin-top:8px;font-size:0.72rem;color:var(--muted);min-height:16px;"></div>
+        </div>
+
+        <!-- HISTORY -->
+        <div id="tips-tab-history" class="tips-tab" style="display:none;">
+          <div class="card" style="margin-bottom:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+              <div class="card-t" style="margin:0;">Tips History</div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <input type="month" id="tips-hist-month" onchange="loadTipsHistory()" style="padding:6px 10px;font-size:0.8rem;width:160px;">
+                <button class="btn btn-o btn-sm" onclick="document.getElementById('tips-hist-month').value='';loadTipsHistory()">All</button>
+              </div>
+            </div>
+            <div id="tips-history-list"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- HISTORY PAGE -->
+      <div class="page" id="page-history">
+        <div class="ph"><h2>History</h2><div class="ph-line"></div><p>Search cloud records — last 30 days by default</p></div>
+        <div class="card" style="margin-bottom:20px;">
+          <div class="history-controls">
+            <div class="fg">
+              <label>From Date</label>
+              <input type="date" id="hist-from">
+            </div>
+            <div class="fg">
+              <label>To Date</label>
+              <input type="date" id="hist-to">
+            </div>
+            <button class="btn btn-p" id="hist-load-btn" onclick="loadHistory()">Load History</button>
+          </div>
+          <div id="history-content"></div>
+        </div>
+      </div>
+
+      <!-- USERS & ACCESS (Manager only) -->
+      <div class="page" id="page-users">
+        <div class="ph"><h2>Users &amp; Access</h2><div class="ph-line"></div><p>Manage employee logins and roles</p></div>
+
+        <!-- DATABASE SETUP CARD -->
+        <div class="card" style="margin-bottom:18px;border-color:rgba(192,57,43,0.25);">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px;">
+            <div>
+              <div class="card-t" style="margin:0 0 4px;">Cloud Database Setup</div>
+              <p style="font-size:0.78rem;color:var(--muted);line-height:1.7;">Click the button to automatically create all required tables in your Supabase database. Safe to run multiple times — will not delete any existing data.</p>
+            </div>
+            <button class="btn btn-p" id="db-setup-btn" onclick="runDatabaseSetup()" style="flex-shrink:0;">
+              ⚙ Setup Database Tables
+            </button>
+          </div>
+          <div id="db-setup-log" style="display:none;background:var(--panel2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;font-size:0.75rem;font-family:monospace;line-height:2;max-height:260px;overflow-y:auto;"></div>
+        </div>
+
+        <div class="card" style="margin-bottom:18px;">
+          <div class="card-t">Current Employee Logins</div>
+          <p style="font-size:0.78rem;color:var(--muted);margin-bottom:16px;line-height:1.8;">Below are the login credentials for each employee. Share the username and password with each staff member. Passwords can be changed by editing this file — contact your system administrator.</p>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Employee</th><th>Username</th><th>Password</th><th>Role</th><th>Access Level</th></tr></thead>
+              <tbody id="users-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-t">Day Close Log</div>
+          <div id="close-day-log-table"></div>
+        </div>
+      </div>
+
+      <!-- SALES PAGE -->
+      <div class="page" id="page-sales">
+        <div class="ph">
+          <h2>Daily Sales</h2>
+          <div class="ph-line"></div>
+          <p id="sales-ph-sub">Good Thing — Sales Dashboard</p>
+        </div>
+
+        <!-- Manager: entry form + end of day button -->
+        <div id="sales-entry-section" style="display:none;">
+          <div class="card" style="margin-bottom:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:18px;">
+              <div class="card-t" style="margin:0;">Log Today's Sales</div>
+              <div style="display:flex;gap:8px;">
+                <button class="btn btn-wa btn-sm" onclick="openSalesWhatsApp()">📱 Share via WhatsApp</button>
+                <button class="btn btn-p btn-sm" onclick="openSalesEndOfDay()" style="background:rgba(192,57,43,0.85);">⬡ End of Day</button>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;">
+              <div class="fg"><label>Date</label><input type="date" id="sales-date"></div>
+              <div class="fg"><label>Total Sales LBP</label><input type="number" id="sales-lbp" placeholder="e.g. 150000000" oninput="salesCalcPreview()"></div>
+              <div class="fg"><label>CCM USD</label><input type="number" id="sales-ccm" step="0.01" placeholder="e.g. 850" oninput="salesCalcPreview()"></div>
+              <div class="fg"><label>Cash USD</label><input type="number" id="sales-cash" step="0.01" placeholder="e.g. 1200" oninput="salesCalcPreview()"></div>
+              <div class="fg"><label>Customers</label><input type="number" id="sales-cust" placeholder="e.g. 65"></div>
+            </div>
+            <div id="sales-preview" style="display:none;margin-top:14px;padding:10px 14px;background:rgba(192,57,43,0.05);border:1px solid rgba(192,57,43,0.15);border-radius:var(--radius);font-size:0.82rem;color:var(--accent);"></div>
+            <div style="margin-top:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+              <button class="btn btn-p" onclick="salesSaveEntry()">💾 Save Entry</button>
+              <span id="sales-save-msg" style="font-size:0.72rem;color:var(--muted);"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats cards (all roles) -->
+        <div class="g4" style="margin-bottom:20px;" id="sales-stats"></div>
+
+        <!-- Tabs: Overview / Daily Log / Monthly -->
+        <div class="tabs" id="sales-tabs">
+          <button class="tab active" onclick="swTab('sales-tab','overview',this)">Overview</button>
+          <button class="tab" onclick="swTab('sales-tab','daily',this)">Daily Log</button>
+          <button class="tab" onclick="swTab('sales-tab','monthly',this)">Monthly</button>
+        </div>
+
+        <div id="sales-tab-overview" class="sales-tab">
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-t">Last 30 Days — Total USD</div>
+            <canvas id="sales-chart-overview" height="80"></canvas>
+          </div>
+          <div class="card">
+            <div class="card-t">Recent Entries</div>
+            <div class="tbl-wrap"><table id="sales-recent-table">
+              <thead><tr><th>Date</th><th>LBP Total</th><th>CCM USD</th><th>Cash USD</th><th>Total USD</th><th>Customers</th><th>Avg Check</th></tr></thead>
+              <tbody id="sales-recent-body"></tbody>
+            </table></div>
+          </div>
+        </div>
+
+        <div id="sales-tab-daily" class="sales-tab" style="display:none;">
+          <div class="card" style="margin-bottom:16px;">
+            <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;">
+              <div class="fg" style="margin:0;"><label>Filter by Month</label>
+                <select id="sales-month-filter" onchange="renderSalesDaily()" style="padding:7px 10px;font-size:0.8rem;">
+                  <option value="">All months</option>
+                </select>
+              </div>
+            </div>
+            <div class="tbl-wrap" id="sales-daily-wrap"></div>
+          </div>
+        </div>
+
+        <div id="sales-tab-monthly" class="sales-tab" style="display:none;">
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-t">Monthly Chart</div>
+            <canvas id="sales-chart-monthly" height="80"></canvas>
+          </div>
+          <div class="card">
+            <div class="card-t">Monthly Summary</div>
+            <div class="tbl-wrap"><table>
+              <thead><tr><th>Month</th><th>Total USD</th><th>CCM</th><th>Cash</th><th>Customers</th><th>Avg / Day</th><th>Avg Check</th></tr></thead>
+              <tbody id="sales-monthly-body"></tbody>
+            </table></div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- Sales End of Day Modal -->
+<div class="modal-bg" id="sales-eod-modal">
+  <div class="modal">
+    <button class="modal-x" onclick="document.getElementById('sales-eod-modal').classList.remove('open')">✕</button>
+    <h3>End of Day — Sales</h3>
+    <p style="font-size:0.82rem;color:var(--muted);line-height:1.8;margin-bottom:14px;">This will archive today's sales entry to history and <strong style="color:var(--dark);">clear the entry form</strong> for the next service day. Historical data is preserved.</p>
+    <div style="background:rgba(192,57,43,0.06);border:1px solid rgba(192,57,43,0.18);border-radius:var(--radius);padding:12px 14px;margin-bottom:18px;font-size:0.78rem;color:var(--dark);line-height:1.75;">
+      ⚠ Make sure today's figures have been saved before closing.
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn btn-o" onclick="document.getElementById('sales-eod-modal').classList.remove('open')">Cancel</button>
+      <button class="btn btn-p" onclick="confirmSalesEndOfDay()">✓ Confirm End of Day</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sales WhatsApp Modal -->
+<div class="modal-bg" id="sales-wa-modal">
+  <div class="modal">
+    <button class="modal-x" onclick="document.getElementById('sales-wa-modal').classList.remove('open')">✕</button>
+    <h3>Share Sales Report</h3>
+    <div class="fg" style="margin-bottom:12px;"><label>Partner WhatsApp Number</label><input type="text" id="sales-wa-num" placeholder="+961 XX XXX XXX" style="margin-top:4px;"></div>
+    <div style="background:var(--panel2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:16px;max-height:280px;overflow-y:auto;">
+      <div class="card-t" style="margin-bottom:8px;">Message Preview</div>
+      <pre id="sales-wa-preview" style="font-size:0.76rem;line-height:1.8;white-space:pre-wrap;color:var(--dark);font-family:'Jost',sans-serif;font-weight:300;"></pre>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn btn-o" onclick="document.getElementById('sales-wa-modal').classList.remove('open')">Cancel</button>
+      <button class="btn btn-wa" onclick="doSalesWhatsApp()">📱 Open WhatsApp</button>
+    </div>
+  </div>
+</div>
+
+<!-- WhatsApp Modal -->
+<div class="modal-bg" id="wa-modal">
+  <div class="modal">
+    <button class="modal-x" onclick="closeWA()">✕</button>
+    <h3>Send to Supplier</h3>
+    <div class="fg"><label>Supplier Name</label><input type="text" id="wa-sname" placeholder="e.g. Golden Food Distributor"></div>
+    <div class="fg"><label>WhatsApp Number (with country code)</label><input type="text" id="wa-num" placeholder="+961 XX XXX XXX"></div>
+    <div style="background:var(--panel2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:16px;max-height:220px;overflow-y:auto;">
+      <div class="card-t" style="margin-bottom:8px;">Order Preview</div>
+      <pre id="wa-preview" style="font-size:0.76rem;line-height:1.75;white-space:pre-wrap;color:var(--dark);font-family:'Jost',sans-serif;font-weight:300;"></pre>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn btn-o" onclick="closeWA()">Cancel</button>
+      <button class="btn btn-wa" onclick="doWA()">📱 Open WhatsApp</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ════════ SUPABASE CONFIG ════════ */
+const SUPABASE_URL = 'https://cciaetarrwltmbnrdpsp.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNjaWFldGFycndsdG1ibnJkcHNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NTM4MjUsImV4cCI6MjA5MTMyOTgyNX0.PpstE9plNa9FKnOp33rE6yAZRWfxy0cP9y-nrViQSY4';
+let _sbClient = null;
+const SUPABASE_CONFIGURED = true;
+
+/* ════════ DATA ════════ */
+
+const SUPPLIERS = {
+  consumables: { name:'Consumables Supplier', items:['Trash Bags xtra Large','Trash Bags Large','Toilet Roll','Interfold','Kitchen Roll - Centerpull','Service Napkins','Toothpicks','Straws Black','Plastic Cups','Cling Film','Aluminum Foil','Gloves Black Large','Hair Nets Black','Butter Paper','Vaccum Bags Small','Vaccum Bags Medium','Microfiber','Chamex','Sponge','Zink','Mops','Table Sanitizer','Hand Soap','Floor Cleaner','Dishwasher','Bleach','Detol','Flash','Easy'] },
+  kitchen: { name:'Kitchen Supplier', items:['Chicken Breast','Beef Cheeks','Short Ribs','Brisket','Chuck Roll','Entrecote','Lobster','Bottarga','Shrimps','Sea Bream','Capocollo','Salami','Sausage','Provolone Cheese','St Marcelin','Beaufort Cheese','Gruyere Cheese','Burrata','Butter Dry N Raw','Butter','Artichoke','Papadum','Smoked Salmon','Sardines','Chocolate Ice Cream','Vanilla Sticks','Wasabi Cricri','Panipuri','Panko','Ketchup','Mayo','Japanese Mayo','Dijon Mustard','Fresh Cream','Sriracha','Peeled Tomatoes','Sunflower Oil','Olive Oil','White Vinegar','Tabasco','Cream Cheese','Mirin','Flour','White Sugar','Brown Sugar','Salt','Fish Sauce','Starch','Yuzu','Reggiano Parmesan','Cider Apple','Worchestershire Sauce','Soya Sauce','Xeres Vinegar','Balsamic','Tomato Paste','Red Wine Vinegar','Wasabi','Capers','Dill Pickles','Penne Pasta','Adas','Tuna Staff','Pain De Mie Brioche','Pain De Viennois','Potato Bun - Burger','Sourdough','Good Thing Bark - Tray','Galangal','Ginger Powder','Carbonate','White Pepper Powder','Black Pepper','Garlic Powder','Onion Powder','Sumac','Curry Powder','Pumpkin Seeds','Paprika','Smoked Paprika','Coriander Powder','Cinnamon Powder'] },
+  golden: { name:'Golden Food', items:['Absolut Vodka','Avion Anejo','Avion Reposado','Avion Blanco','Avion 44 Reserva','Avion Cristallino','Altos Anejo','Altos Reposado','Altos Blanco','Befeeter Gin','Befeeter 24','Malfy Original','Malfy Lemon','Malfy Orange','Malfy Rose','Monkey 47 Dry','Monkey 47 Sloe','Lillet Blanc','Lillet Rose','Lillet Rouge','Plymouth','Pernod Absinthe','Ricard','Malibu','Scapa','Suze','Kahlua','Jameson','Jameson Caskmates IPA','Jameson Caskmates Stout','Jameson Crested','Jameson Black Barrel','Chivas 12Y','Chivas 13Y','Chivas 15Y','Chivas 18Y','Chivas 25Y','Ballentines','Aberlour 12Y','Aberlour 14Y','Aberlour 16Y','The Glenlivet 12YO','The Glenlivet 15YO','The Glenlivet 18YO','The Glenlivet Founders','The Glenlivet Captains Reserve','The Glenlivet Triple Cask','Havana Club 3Y','Havana Club 7Y','Havana Spiced','Martell XO','Martell VS','Martell VSOP'] },
+  eba: { name:'EBA', items:['Water Small','Water Large','San Pellegrino','Almaza Beer','Heineken Beer','Pepsi Can','Diet Pepsi Can','Seven Up Can','Diet Seven Up Can','Tonic Glass','Soda Glass','Grapefruit Soda','Ginger Beer','Belvedere Vodka','Greygoose Vodka','Kettel One Vodka','Tittos Vodka','Russian Standard Vodka','Campari','Aperol','Bacardi White','Amaretto Disaronno','Tanquerray','Tanquerray 10','Roku Gin','Hendricks','Ginmare','1800 Reposado','1800 Anejo','1800 Blanco','Don Julio Reposado','Don Julio Anejo','Don Julio Blanco','Don Julio 1942','Patron Reposado','Patron Anjeo','Patron Blanco','Casamigo Reposado','Casamigos Anejo','Casamigos Blanco','Triple Sec','St Germain','Kahlua','Skinos','Jagermeister','Goldshlager','Baileys','Midori','Malibou','Passion Fruit Syrup','Vanilla Syrup','Black Label','Glenfiddich 12','Glenfiddich 14','Glenfiddich 18','Nikka From The Barrel','Bullet Bourbon','Bullet Rye','Maccalan 12Y','Maccalan 15Y','Maccalan 18Y','Old Parr','Monkey Shoulder','Famous Grouse','Jack Daniel','Captain Morgan White','Captain Morgan Dark','Captain Morgan Spiced','Arak Brun','Martini Blanco','Martini Rosso','Martini xtra Dry','Mad Olives','Tabasco','Angostura Orange','Angostura Aromatic','Sake'] },
+  eam: { name:'EAM', items:['DDT Marquis De Bey — White','Atibaia White','Mirabello Pinot Grigio','Araldica Gavi Di Gavi','Chateau De Respide','Domaine De Rochebin Bourgogne Chardonnay','Domaine De Chardonnay - Chablis','La Petite Perriere - Sauvignon Blanc','Chateau D\'Estoublon - Roseblood White','Berronia - Verdeio Rueda','Malma Chacra La Papay - Sauvignon Blanc','La Petite Perriere - Pinot Noir Rose','Chateau D\'Estoublon - Roseblood Rose','Tattinger Brut Reserve','Gancia Prosecco','DDT Vieilles Vignes Cinsault','Atibaia Red','Cecchi Iclassico Sangiovese','Jean Baptiste Jessiaume - Santenay Rouge','Domaine De Rochebin - Bourgogne Pinot Noir','Chateau De Garbes Bordeaux','Chateau Tour De Pez','Domaine De Lambisque - Les Vignes Sauvages','Oraison - Cotes Du Rhone','Beronia Tempranillo','Domaine De Bel Air - Fleurie','Domaine De Pere Gaboche - Chateauneuf Du Pape','Malma Reserva De La Familia - Malbec'] }
+};
+
+const CHECKLISTS = {
+  'foh-open': [
+    { section:'INDOOR', tasks:[
+      {t:'Turn on the light / check if any burnt light',f:'Daily'},
+      {t:'Turn on the AC / check if working properly (if needed)',f:'Daily'},
+      {t:'Turn on the POS system / check if updated (End of day)',f:'Daily'},
+      {t:'Turn on the printers / check if working properly / check the paper rolls',f:'Daily'},
+      {t:'Check Doors glasses (well polished, borders free of dust)',f:'Daily'},
+      {t:'Turn music on before 4:30pm',f:'Daily'},
+      {t:'All Benches should be clean',f:'Daily'},
+      {t:'Polish the station and the POS',f:'Daily'},
+      {t:'Check the Salt & pepper mills',f:'Daily'},
+      {t:'Prepare tea spoons for sauces',f:'Daily'},
+      {t:'Prepare serving spoons for salads',f:'Daily'},
+      {t:'Check the CCM machine if charged',f:'Daily'},
+      {t:'Clean all menus',f:'Daily'},
+      {t:'Refill napkins holders',f:'Daily'},
+      {t:'Prepare wine buckets',f:'Daily'},
+      {t:'Make sure tables are fixed to floor',f:'Daily'},
+      {t:'Ask steward to clean the stairs',f:'Daily'},
+      {t:'Make sure toilet is ready (clean floor, walls, chairs, light on, mechanism working properly, soap, tissues available)',f:'Daily'},
+      {t:'Refill tables sanitizers',f:'Daily'},
+      {t:'Charge table lamps and make sure they are on tables before service',f:'Daily'},
+      {t:'Check water tanks and inform the manager',f:'Daily'},
+      {t:'Check 86 items — bar & kitchen',f:'Daily'},
+    ]},
+  ],
+  'foh-close': [
+    { section:'POST-SERVICE', tasks:[
+      {t:'Polish all cutleries, chinaware, glassware',f:'Daily'},
+      {t:'Clean and refill salt & pepper mills',f:'Daily'},
+      {t:'Refill and clean the side station as per the standard',f:'Daily'},
+      {t:'Send the trays to dishwasher',f:'Daily'},
+      {t:'Soak polishing towels, wine & kitchen towels overnight with Soap & water',f:'Daily'},
+      {t:'Turn off the music',f:'Daily'},
+      {t:'Turn off the POS (end of day)',f:'Daily'},
+      {t:'Clean all tables',f:'Daily'},
+      {t:'Charge the CCM machine',f:'Daily'},
+      {t:'Turn off the light (Leave the sign)',f:'Daily'},
+      {t:'Put inside tables and benches',f:'Daily'},
+      {t:'Make sure all doors are closed (main, terrace and backdoors)',f:'Daily'},
+    ]},
+  ],
+  'bar-open': [
+    { section:'BEHIND BAR — CLEAN & SANITIZE', tasks:[
+      {t:'Coffee machine',f:'Daily'},
+      {t:'Wash and sanitize all bar surfaces (bar top, counters, speed rails)',f:'Daily'},
+      {t:'Sanitize bar tools (shakers, strainers, muddlers, bar spoons)',f:'Daily'},
+      {t:'Wipe down POS screens, phone, and any handhelds',f:'Daily'},
+      {t:'Check that all glassware is clean, polished, and organized',f:'Daily'},
+    ]},
+    { section:'STOCK & PREP', tasks:[
+      {t:'Refill speed rails with well spirits',f:'Daily'},
+      {t:'Refill garnish trays with fresh lemon, lime, orange, cherries, herbs',f:'Daily'},
+      {t:'Cut fresh fruit and prepare garnishes',f:'Daily'},
+      {t:'Restock beer, wine, and spirits from the storage room',f:'Daily'},
+      {t:'Fill ice wells with fresh ice',f:'Daily'},
+      {t:'Restock mixers (tonic, soda, juices, syrups)',f:'Daily'},
+      {t:'Prepare fresh juice or syrups if needed',f:'Daily'},
+      {t:'Check and restock bar napkins, straws, stirrers, coasters',f:'Daily'},
+    ]},
+    { section:'PRODUCT & INVENTORY CHECK', tasks:[
+      {t:'Count and log inventory of high-use spirits (if required)',f:'Daily'},
+      {t:'Check levels of signature ingredients or limited-time products',f:'Daily'},
+      {t:'Confirm enough glassware is stocked for service (wine, cocktail, rocks, etc.)',f:'Daily'},
+    ]},
+    { section:'TEAM COMMUNICATION', tasks:[
+      {t:'Review daily specials or promotions',f:'Daily'},
+      {t:'Check reservation list or expected guest count (if applicable)',f:'Daily'},
+      {t:'Note any VIP guests or events',f:'Daily'},
+      {t:'Communicate with manager/kitchen for any changes or updates',f:'Daily'},
+    ]},
+    { section:'FINAL 15 MINUTES BEFORE DOORS OPEN', tasks:[
+      {t:'Wipe down everything again for presentation',f:'Daily'},
+      {t:'Line up all garnish trays and tools neatly',f:'Daily'},
+      {t:'Turn on lights, bar sign/neon (if any), and music at opening levels',f:'Daily'},
+      {t:'Take a deep breath — you\'re ready to go!',f:'Daily'},
+    ]},
+  ],
+  'bar-close': [
+    { section:'1. CLEAN & SANITIZE', tasks:[
+      {t:'Wipe down all bar surfaces (bar top, counters, shelves)',f:'Daily'},
+      {t:'Sanitize all bar tools (shakers, jiggers, strainers, bar spoons)',f:'Daily'},
+      {t:'Wash and polish glassware, store upside down on clean mats',f:'Daily'},
+      {t:'Sanitize garnish trays and cutting boards, store or discard leftovers',f:'Daily'},
+      {t:'Clean espresso machine or coffee equipment',f:'Daily'},
+    ]},
+    { section:'2. BREAK DOWN & RESTOCK', tasks:[
+      {t:'Remove and discard old garnishes / wash and clean GN trays',f:'Daily'},
+      {t:'Store all juices, syrups, and perishables in labeled containers in fridge',f:'Daily'},
+      {t:'Refill and organize spirits on speed rail for next shift',f:'Daily'},
+      {t:'Wipe down bottles and speed rail',f:'Daily'},
+      {t:'Remove all pourers from bottles on speed rails and wash for next day',f:'Daily'},
+    ]},
+    { section:'3. ICE & WASTE', tasks:[
+      {t:'Melt or discard leftover ice, clean ice wells',f:'Daily'},
+      {t:'Empty trash bins behind the bar — CLEAN UNDER BIN — replace with clean bags',f:'Daily'},
+      {t:'Dispose of food/garnish waste',f:'Daily'},
+    ]},
+    { section:'4. EQUIPMENT CHECK', tasks:[
+      {t:'Place lights on charger',f:'Daily'},
+      {t:'Place phone and card machine on charger',f:'Daily'},
+      {t:'Clean and wipe down coffee machines and grinders',f:'Daily'},
+    ]},
+    { section:'5. RESTOCK & REPLENISH', tasks:[
+      {t:'Check inventory levels and log low stock items',f:'Daily'},
+      {t:'Restock napkins, straws, coasters',f:'Daily'},
+      {t:'Check receipt paper in POS, reorder if low or restock',f:'Daily'},
+      {t:'Refill backup stock of glassware, garnishes, and utensils for the next shift',f:'Daily'},
+    ]},
+    { section:'6. SECURITY & FINAL CHECK', tasks:[
+      {t:'Count and log cash (if applicable), close the register',f:'Daily'},
+      {t:'Turn off music and bar lighting',f:'Daily'},
+      {t:'Lock all doors and exits as per closing protocol',f:'Daily'},
+    ]},
+    { section:'SHIFT REPORT (Optional)', tasks:[
+      {t:'Note any incidents, guest feedback, or breakages',f:'Daily'},
+      {t:'List any items needed for next service (inventory, repairs)',f:'Daily'},
+      {t:'Sign out with manager or supervisor',f:'Daily'},
+    ]},
+  ],
+  'foh-clean': [
+    { section:'WALL SECTION', tasks:[
+      {t:'Remove sofas and clean underneath',f:'3× Week'},
+      {t:'Clean stainless steel above sofas',f:'3× Week'},
+      {t:'Fix curtains — adjust and align',f:'3× Week'},
+      {t:'Clean all the books and bottles on the shelve',f:'3× Week'},
+      {t:'Clean glass window above the sofa',f:'1× Week'},
+      {t:'Speakers',f:'3× Week'},
+      {t:'Tables surface',f:'Daily'},
+      {t:'Wood table legs',f:'Daily'},
+    ]},
+    { section:'FRONT OF HOUSE', tasks:[
+      {t:'Clean wood front bar underneath the Marble',f:'Daily'},
+      {t:'Marble top — clean daily before opening',f:'Daily'},
+      {t:'High stools and chairs — check and clean daily',f:'Daily'},
+    ]},
+    { section:'BEHIND BAR — CLEAN & SANITIZE', tasks:[
+      {t:'Coffee machine',f:'Daily'},
+      {t:'Wash and sanitize all bar surfaces (bar top, counters, speed rails)',f:'Daily'},
+      {t:'Sanitize bar tools (shakers, strainers, muddlers, bar spoons)',f:'Daily'},
+      {t:'Wipe down POS screens, phone, and any handhelds',f:'Daily'},
+      {t:'Check that all glassware is clean, polished, and organized',f:'Daily'},
+    ]},
+    { section:'STOCK & PREP', tasks:[
+      {t:'Refill speed rails with well spirits',f:'Daily'},
+      {t:'Refill garnish trays with fresh lemon, lime, orange, cherries, herbs',f:'Daily'},
+      {t:'Cut fresh fruit and prepare garnishes',f:'Daily'},
+      {t:'Restock beer, wine, and spirits from the storage room',f:'Daily'},
+      {t:'Fill ice wells with fresh ice',f:'Daily'},
+      {t:'Restock mixers (tonic, soda, juices, syrups)',f:'Daily'},
+      {t:'Prepare fresh juice or syrups if needed',f:'Daily'},
+      {t:'Check and restock bar napkins, straws, stirrers, coasters',f:'Daily'},
+    ]},
+    { section:'PRODUCT & INVENTORY CHECK', tasks:[
+      {t:'Count and log inventory of high-use spirits (if required)',f:'Daily'},
+      {t:'Check levels of signature ingredients or limited-time products',f:'Daily'},
+      {t:'Confirm enough glassware is stocked for service (wine, cocktail, rocks, etc.)',f:'Daily'},
+    ]},
+    { section:'TEAM COMMUNICATION', tasks:[
+      {t:'Review daily specials or promotions',f:'Daily'},
+      {t:'Check reservation list or expected guest count (if applicable)',f:'Daily'},
+      {t:'Note any VIP guests or events',f:'Daily'},
+      {t:'Communicate with manager/kitchen for any changes or updates',f:'Daily'},
+    ]},
+    { section:'FINAL 15 MINUTES BEFORE DOORS OPEN', tasks:[
+      {t:'Wipe down everything again for presentation',f:'Daily'},
+      {t:'Line up all garnish trays and tools neatly',f:'Daily'},
+      {t:'Turn on lights, bar sign/neon (if any), and music at opening levels',f:'Daily'},
+      {t:'Take a deep breath — you\'re ready to go!',f:'Daily'},
+    ]},
+  ],
+};
+
+const DEFAULT_STAFF = [
+  {name:'Joelle',pos:'Manager',shares:4,ded:0,with:0},
+  {name:'Reposado',pos:'Bartender',shares:3,ded:0,with:0},
+  {name:'Mohamad Arab',pos:'Waiter',shares:3,ded:0,with:0},
+  {name:'Kitchen',pos:'Kitchen',shares:5,ded:0,with:0},
+  {name:'Farouk',pos:'Cleaner',shares:0.5,ded:0,with:0},
+  {name:'Shawon',pos:'Cleaner',shares:0.5,ded:0,with:0},
+  {name:'Breakage',pos:'',shares:0.5,ded:0,with:0},
+];
+
+/* ════════ USER ACCOUNTS ════════
+   role: 'manager'      — full access + close day + sales entry
+   role: 'staff'        — checklists, wastage, requisition
+   role: 'sales-viewer' — sales dashboard only (read-only)
+   ════════════════════════════════ */
+const USERS = [
+  { username: 'joelle',   password: 'joelle2026',   display: 'Joelle',       role: 'manager'      },
+  { username: 'reposado', password: 'bar2026',       display: 'Reposado',     role: 'staff'        },
+  { username: 'mohamad',  password: 'waiter2026',    display: 'Mohamad Arab', role: 'staff'        },
+  { username: 'kitchen',  password: 'kitchen2026',   display: 'Kitchen',      role: 'staff'        },
+  { username: 'omar',     password: 'omar2026',      display: 'Omar Jheir',   role: 'sales-viewer' },
+  { username: 'khaled',   password: 'khaled2026',    display: 'Khaled Zeidan',role: 'sales-viewer' },
+];
+
+let CURRENT_USER = null;
+
+/* ════════ LOCK ════════ */
+document.getElementById('lock-input').addEventListener('keydown',e=>{ if(e.key==='Enter') unlock(); });
+function unlock(){
+  const uname = document.getElementById('lock-username').value.trim().toLowerCase();
+  const pass  = document.getElementById('lock-input').value;
+  const user  = USERS.find(u => u.username === uname && u.password === pass);
+  if(user){
+    CURRENT_USER = user;
+    document.getElementById('lock').style.display='none';
+    document.getElementById('app').style.display='block';
+    applyRoleUI();
+    if(user.role === 'sales-viewer'){
+      // Sales viewers only see the sales page — still need Supabase for cloud data
+      initSupabase().then(()=>{
+        showPage('sales', null);
+      });
+    } else {
+      init();
+    }
+  } else {
+    document.getElementById('lock-err').textContent = 'Incorrect username or password';
+    document.getElementById('lock-input').value = '';
+    setTimeout(()=>{ document.getElementById('lock-err').textContent=''; },2500);
+  }
+}
+
+function applyRoleUI(){
+  const role = CURRENT_USER.role;
+  // Header badge
+  const roleLabel = { manager: 'Manager', staff: 'Staff', 'sales-viewer': 'Partner' };
+  document.getElementById('header-username').textContent = CURRENT_USER.display + ' · ' + (roleLabel[role] || role);
+
+  // Sales-viewer: hide ALL nav except Sales, hide close-day btn
+  if(role === 'sales-viewer'){
+    document.querySelectorAll('nav .nav-item, nav .nav-sec').forEach(n => n.style.display='none');
+    document.getElementById('nav-item-sales').style.display = 'flex';
+    document.getElementById('nav-sec-sales').style.display = 'block';
+    return; // no further setup needed
+  }
+
+  // Personalize dashboard welcome
+  const greet = document.getElementById('dash-welcome');
+  if(greet) greet.textContent = 'Welcome, ' + CURRENT_USER.display + ' — Daily Overview';
+
+  // Show Close Day button and manager nav only for managers
+  if(role === 'manager'){
+    document.getElementById('close-day-btn').style.display = 'inline-block';
+    document.getElementById('nav-sec-manager').style.display = 'block';
+    document.getElementById('nav-item-users').style.display = 'flex';
+    renderUsersTable();
+    renderCloseDayLog();
+  }
+
+  // Show Sales nav for manager too (they can also enter sales)
+  if(role === 'manager'){
+    document.getElementById('nav-item-sales').style.display = 'flex';
+    document.getElementById('nav-sec-sales').style.display = 'block';
+    const salesBtn = document.getElementById('dash-sales-btn');
+    if(salesBtn) salesBtn.style.display = 'block';
+    const dbWrap = document.getElementById('dash-db-setup-wrap');
+    if(dbWrap) dbWrap.style.display = 'block';
+  }
+
+  // Hide Tips/History nav and quick-access from staff
+  if(role === 'staff'){
+    document.querySelectorAll('.nav-item').forEach(n=>{
+      const oc = n.getAttribute('onclick')||'';
+      if(oc.includes("'history'") || oc.includes("'tips'") || oc.includes("'sales'")) n.style.display='none';
+    });
+    document.querySelectorAll('.nav-sec').forEach(n=>{
+      if(n.id === 'nav-sec-sales') n.style.display='none';
+    });
+    const tipBtn = document.getElementById('dash-tips-btn');
+    if(tipBtn) tipBtn.style.display='none';
+  }
+
+  // Auto-fill name fields after a brief delay to let DOM settle
+  setTimeout(autoFillSignatureFields, 100);
+}
+
+function autoFillSignatureFields(){
+  if(!CURRENT_USER) return;
+  const name = CURRENT_USER.display;
+  const role = CURRENT_USER.role;
+  // FOH open/close: if staff, fill waiter field; if manager, fill manager field
+  ['foh-open','foh-close'].forEach(key=>{
+    const waiterEl  = document.getElementById(key+'-waiter');
+    const managerEl = document.getElementById(key+'-manager');
+    if(role === 'manager' && managerEl && !managerEl.value) managerEl.value = name;
+    if(role === 'staff'   && waiterEl  && !waiterEl.value)  waiterEl.value  = name;
+  });
+  // Wastage: auto-fill responsible name
+  ['kitchen','bar','floor'].forEach(dept=>{
+    const el = document.getElementById('wn-'+dept);
+    if(el && !el.value) el.value = name;
+  });
+  // Requisition requested-by
+  const reqBy = document.getElementById('req-by');
+  if(reqBy && !reqBy.value) reqBy.value = name;
+}
+
+function renderUsersTable(){
+  const tbody = document.getElementById('users-table-body');
+  if(!tbody) return;
+  const accessMap = {
+    manager:      'All sections + Sales entry + Close Day + History + Tips + Users',
+    staff:        'Checklists, Wastage, Requisition',
+    'sales-viewer': 'Sales dashboard only (read-only)'
+  };
+  tbody.innerHTML = USERS.map(u=>`<tr>
+    <td><strong>${u.display}</strong></td>
+    <td style="font-family:monospace;letter-spacing:0.05em;">${u.username}</td>
+    <td style="font-family:monospace;letter-spacing:0.05em;">${u.password}</td>
+    <td><span style="display:inline-block;padding:2px 10px;border-radius:20px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;background:${u.role==='manager'?'rgba(192,57,43,0.1)':'rgba(155,155,155,0.1)'};color:${u.role==='manager'?'var(--accent)':'var(--muted)'};">${u.role}</span></td>
+    <td style="font-size:0.76rem;color:var(--muted);">${accessMap[u.role]}</td>
+  </tr>`).join('');
+}
+
+function renderCloseDayLog(){
+  const el = document.getElementById('close-day-log-table');
+  if(!el) return;
+  const log = JSON.parse(localStorage.getItem('day-close-log')||'[]').reverse();
+  if(!log.length){ el.innerHTML='<p style="font-size:0.82rem;color:var(--muted);padding:20px 0;">No days closed yet.</p>'; return; }
+  el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.81rem;">
+    <thead><tr><th style="text-align:left;padding:8px 12px;font-size:0.6rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);font-weight:400;border-bottom:2px solid var(--border);">Date</th><th style="text-align:left;padding:8px 12px;font-size:0.6rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);font-weight:400;border-bottom:2px solid var(--border);">Closed By</th><th style="text-align:left;padding:8px 12px;font-size:0.6rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);font-weight:400;border-bottom:2px solid var(--border);">Time</th></tr></thead>
+    <tbody>${log.map(l=>`<tr>
+      <td style="padding:8px 12px;border-bottom:1px solid var(--border);">${l.date}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid var(--border);">${l.closedBy}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--muted);">${new Date(l.closedAt).toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+
+function logout(){
+  CURRENT_USER = null;
+  // Destroy any sales charts so they reinitialize cleanly on next login
+  if(_salesChartOv){ _salesChartOv.destroy(); _salesChartOv=null; }
+  if(_salesChartMo){ _salesChartMo.destroy(); _salesChartMo=null; }
+  _salesData = null;
+  // Reset nav items that may have been hidden/shown
+  document.querySelectorAll('.nav-item').forEach(n=>n.style.display='');
+  document.querySelectorAll('.nav-sec').forEach(n=>n.style.display='');
+  document.getElementById('close-day-btn').style.display='none';
+  document.getElementById('nav-sec-manager').style.display='none';
+  document.getElementById('nav-item-users').style.display='none';
+  document.getElementById('nav-sec-sales').style.display='none';
+  document.getElementById('nav-item-sales').style.display='none';
+  const salesBtn = document.getElementById('dash-sales-btn');
+  if(salesBtn) salesBtn.style.display='none';
+  // Return to lock screen
+  document.getElementById('lock').style.display='flex';
+  document.getElementById('app').style.display='none';
+  document.getElementById('lock-username').value='';
+  document.getElementById('lock-input').value='';
+  document.getElementById('lock-err').textContent='';
+}
+
+/* ════════ CLOSE DAY (Manager only) ════════ */
+function openCloseDay(){
+  if(!CURRENT_USER || CURRENT_USER.role !== 'manager'){
+    toast('Only managers can close the day');
+    return;
+  }
+  document.getElementById('close-day-modal').classList.add('open');
+}
+
+async function confirmCloseDay(){
+  document.getElementById('close-day-modal').classList.remove('open');
+  toast('Closing day & archiving data…');
+
+  // Archive to cloud if configured (checklists, wastage already synced live)
+  // Reset all localStorage daily keys
+  const today = new Date().toISOString().split('T')[0];
+
+  // Reset checklists
+  Object.keys(CHECKLISTS).forEach(key=>{
+    localStorage.removeItem('cl-'+key);
+  });
+
+  // Reset wastage
+  ['kitchen','bar','floor'].forEach(dept=>{
+    localStorage.removeItem('ws-'+dept);
+    localStorage.removeItem('ws-meta-'+dept);
+  });
+
+  // Reset requisition quantities (keep supplier names/numbers)
+  Object.keys(SUPPLIERS).forEach(cat=>{
+    localStorage.removeItem('rq-'+cat);
+  });
+
+  // Log close event
+  const closeLog = JSON.parse(localStorage.getItem('day-close-log')||'[]');
+  closeLog.push({ date: today, closedBy: CURRENT_USER.display, closedAt: new Date().toISOString() });
+  localStorage.setItem('day-close-log', JSON.stringify(closeLog));
+
+  // Re-render all sections fresh
+  buildAllChecklists();
+  buildWastage();
+  buildTips();
+  updateDash();
+  showPage('dashboard', null);
+
+  toast('Day closed — all data reset for next service ✓');
+}
+
+/* ════════ SUPABASE INIT ════════ */
+async function initSupabase(){
+  if(!SUPABASE_CONFIGURED){
+    updateSyncBadge('not-configured');
+    return;
+  }
+  // Guard: only ever create ONE client instance
+  if(_sbClient) { await loadTodayFromCloud(); return; }
+  try {
+    _sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+    });
+    updateSyncBadge('ready');
+    await loadTodayFromCloud();
+  } catch(e){
+    console.error('Supabase init failed:',e);
+  }
+}
+
+async function loadTodayFromCloud(){
+  if(!_sbClient) return;
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    // Load checklists for today
+    const {data:chklists} = await _sbClient.from('checklists').select('*').eq('date',today);
+    if(chklists){
+      chklists.forEach(c=>{
+        const existing = JSON.parse(localStorage.getItem('cl-'+c.checklist_key)||'{}');
+        const merged = {...existing, ...c.state};
+        localStorage.setItem('cl-'+c.checklist_key, JSON.stringify(merged));
+      });
+    }
+    // Load wastage for today
+    const {data:wastes} = await _sbClient.from('wastage_logs').select('*').eq('date',today);
+    if(wastes){
+      wastes.forEach(w=>{
+        const existing = JSON.parse(localStorage.getItem('ws-'+w.dept)||'[]');
+        const merged = w.rows.length ? w.rows : existing;
+        localStorage.setItem('ws-'+w.dept, JSON.stringify(merged));
+        const meta = {name:w.responsible_name||'',date:w.date};
+        localStorage.setItem('ws-meta-'+w.dept, JSON.stringify(meta));
+      });
+    }
+    // Load tips for today
+    const {data:tiplist} = await _sbClient.from('tips').select('*').eq('date',today);
+    if(tiplist && tiplist.length){
+      const tipsRecord = tiplist[0];
+      localStorage.setItem('tips-day-'+today, JSON.stringify(tipsRecord));
+    }
+    // Load sales from cloud (runs in background, sales page re-renders when visited)
+    loadSalesFromCloud();
+    // Re-render all sections
+    buildAllChecklists();
+    buildWastage();
+    buildTips();
+    updateDash();
+  } catch(e){
+    console.error('Cloud load failed:',e);
+  }
+}
+
+function updateSyncBadge(state){
+  const badge = document.getElementById('sync-badge');
+  if(state === 'not-configured'){
+    badge.textContent = '⚠ Cloud not configured';
+    badge.style.color = 'var(--muted)';
+    document.getElementById('cloud-info-text').textContent = 'Cloud sync not configured — data stored locally only.';
+  } else if(state === 'syncing'){
+    badge.textContent = '☁ Syncing...';
+    badge.classList.add('syncing');
+  } else if(state === 'ready'){
+    badge.textContent = '☁ Ready';
+    badge.classList.remove('syncing');
+    badge.style.color = 'var(--accent)';
+  } else if(state === 'saved'){
+    badge.textContent = '☁ Saved';
+    badge.classList.remove('syncing');
+    badge.style.color = 'var(--accent)';
+    setTimeout(()=>{ if(badge.textContent==='☁ Saved') updateSyncBadge('ready'); },2000);
+  }
+}
+
+async function syncChecklist(key){
+  if(!_sbClient) return;
+  try {
+    updateSyncBadge('syncing');
+    const today = new Date().toISOString().split('T')[0];
+    const state = JSON.parse(localStorage.getItem('cl-'+key)||'{}');
+    const waiter = document.getElementById(key+'-waiter')?.value || '';
+    const manager = document.getElementById(key+'-manager')?.value || '';
+    await _sbClient.from('checklists').upsert({
+      date:today, checklist_key:key, state, waiter, manager, updated_at:new Date().toISOString()
+    }, {onConflict:'date,checklist_key'});
+    updateSyncBadge('saved');
+  } catch(e){
+    console.error('Checklist sync failed:',e);
+  }
+}
+
+async function syncWastage(dept){
+  if(!_sbClient) return;
+  try {
+    updateSyncBadge('syncing');
+    const today = new Date().toISOString().split('T')[0];
+    const rows = JSON.parse(localStorage.getItem('ws-'+dept)||'[]');
+    const meta = JSON.parse(localStorage.getItem('ws-meta-'+dept)||'{}');
+    await _sbClient.from('wastage_logs').upsert({
+      date:today, dept, rows, responsible_name:meta.name||'', updated_at:new Date().toISOString()
+    }, {onConflict:'date,dept'});
+    updateSyncBadge('saved');
+  } catch(e){
+    console.error('Wastage sync failed:',e);
+  }
+}
+
+async function syncTips(record){
+  if(!_sbClient) return;
+  try {
+    updateSyncBadge('syncing');
+    await _sbClient.from('tips').upsert({
+      date:record.date,
+      pool:record.pool,
+      per_share:record.perShare,
+      total_shares:record.totalShares,
+      staff:record.staff,
+      saved_at:record.savedAt
+    }, {onConflict:'date'});
+    updateSyncBadge('saved');
+  } catch(e){
+    console.error('Tips sync failed:',e);
+  }
+}
+
+async function syncSupplierSettings(cat){
+  if(!_sbClient) return;
+  try {
+    const name = localStorage.getItem('sup-name-'+cat) || SUPPLIERS[cat].name;
+    const phone = localStorage.getItem('sup-num-'+cat) || '';
+    await _sbClient.from('supplier_settings').upsert({
+      cat, name, phone, updated_at:new Date().toISOString()
+    }, {onConflict:'cat'});
+  } catch(e){
+    console.error('Supplier sync failed:',e);
+  }
+}
+
+async function syncRequisition(cat, date, by, qtys, units){
+  if(!_sbClient) return;
+  try {
+    updateSyncBadge('syncing');
+    const supplier = localStorage.getItem('sup-name-'+cat) || SUPPLIERS[cat].name;
+    await _sbClient.from('requisitions').upsert({
+      date, supplier, requested_by:by, quantities:qtys, units, sent_at:new Date().toISOString()
+    }, {onConflict:'date,supplier'});
+    updateSyncBadge('saved');
+  } catch(e){
+    console.error('Requisition sync failed:',e);
+  }
+}
+
+/* ════════ INIT ════════ */
+function init(){
+  const today = new Date();
+  document.getElementById('hdate').textContent = today.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('req-date').value = today.toISOString().split('T')[0];
+  document.getElementById('tips-date').value = today.toISOString().split('T')[0];
+  document.getElementById('foh-open-date').value = today.toISOString().split('T')[0];
+  document.getElementById('foh-close-date').value = today.toISOString().split('T')[0];
+
+  // History defaults
+  const to = today.toISOString().split('T')[0];
+  const from = new Date(today.getTime() - 30*24*60*60*1000).toISOString().split('T')[0];
+  document.getElementById('hist-from').value = from;
+  document.getElementById('hist-to').value = to;
+
+  initSupabase();
+  buildAllChecklists();
+  buildRequisition('consumables');
+  buildWastage();
+  buildTips();
+  updateDash();
+  autoFillSignatureFields();
+  // Seed navigation history
+  _navHistory = ['dashboard'];
+  _navPos = 0;
+  _updateNavBtns();
+}
+
+/* ════════ PAGE NAV WITH HISTORY ════════ */
+let _navHistory = [];
+let _navPos     = -1;
+let _navSkip    = false; // prevent history push during back/forward
+
+function showPage(id, el){
+  if(CURRENT_USER){
+    const role = CURRENT_USER.role;
+    if(role === 'sales-viewer' && id !== 'sales'){
+      toast('Access restricted — Sales view only');
+      return;
+    }
+    if(role === 'staff' && (id==='tips'||id==='history'||id==='sales')){
+      toast('Access restricted — manager only');
+      return;
+    }
+  }
+  _doShowPage(id, el);
+  if(!_navSkip){
+    _navHistory = _navHistory.slice(0, _navPos + 1);
+    _navHistory.push(id);
+    _navPos = _navHistory.length - 1;
+  }
+  _updateNavBtns();
+}
+
+function _doShowPage(id, el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  if(el) el.classList.add('active');
+  else document.querySelectorAll('.nav-item').forEach(n=>{
+    if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+id+"'")) n.classList.add('active');
+  });
+  // Always initialise the sales page when navigating to it
+  if(id === 'sales') initSalesPage();
+}
+
+function showPageById(id){
+  if(CURRENT_USER && CURRENT_USER.role === 'staff' && (id==='tips'||id==='history')){
+    toast('Access restricted — manager only');
+    return;
+  }
+  _doShowPage(id, null);
+  if(!_navSkip){
+    _navHistory = _navHistory.slice(0, _navPos + 1);
+    _navHistory.push(id);
+    _navPos = _navHistory.length - 1;
+  }
+  _updateNavBtns();
+}
+
+function navBack(){
+  if(_navPos <= 0) return;
+  _navPos--;
+  _navSkip = true;
+  const id = _navHistory[_navPos];
+  _doShowPage(id, null);
+  // Handle supplier pages stored as 'supplier:cat'
+  if(id.startsWith('supplier:')){
+    const cat = id.split(':')[1];
+    showSupplier(cat, null, true);
+  }
+  _navSkip = false;
+  _updateNavBtns();
+}
+
+function navForward(){
+  if(_navPos >= _navHistory.length - 1) return;
+  _navPos++;
+  _navSkip = true;
+  const id = _navHistory[_navPos];
+  if(id.startsWith('supplier:')){
+    const cat = id.split(':')[1];
+    showSupplier(cat, null, true);
+  } else {
+    _doShowPage(id, null);
+  }
+  _navSkip = false;
+  _updateNavBtns();
+}
+
+function _updateNavBtns(){
+  const back = document.getElementById('nav-back-btn');
+  const fwd  = document.getElementById('nav-fwd-btn');
+  if(!back||!fwd) return;
+  const canBack = _navPos > 0;
+  const canFwd  = _navPos < _navHistory.length - 1;
+  back.disabled = !canBack;
+  back.style.opacity = canBack ? '1' : '0.3';
+  back.style.color   = canBack ? 'var(--dark)' : 'var(--muted)';
+  fwd.disabled  = !canFwd;
+  fwd.style.opacity  = canFwd  ? '1' : '0.3';
+  fwd.style.color    = canFwd  ? 'var(--dark)' : 'var(--muted)';
+}
+
+/* ════════ TABS ════════ */
+function swTab(prefix, id, el){
+  const cls = prefix.includes('-tab') ? prefix : prefix+'-tab';
+  document.querySelectorAll('.'+cls).forEach(t=>{ t.style.display='none'; t.classList.remove('active'); });
+  document.getElementById(prefix+'-'+id).style.display='block';
+  document.getElementById(prefix+'-'+id).classList.add('active');
+  el.closest('.tabs').querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+}
+
+/* ════════ CUSTOM TASKS (add / remove per checklist) ════════
+   Custom tasks are stored in localStorage as 'cl-custom-{key}': [{t, f}]
+   They survive day-close (permanent additions) — only checked state resets.
+   To permanently remove a custom task the user clicks ✕ next to it.
+   ═══════════════════════════════════════════════════════════ */
+function getCustomTasks(key){
+  return JSON.parse(localStorage.getItem('cl-custom-'+key)||'[]');
+}
+function saveCustomTasks(key, tasks){
+  localStorage.setItem('cl-custom-'+key, JSON.stringify(tasks));
+}
+
+function addCustomTask(key){
+  const inp = document.getElementById('add-task-'+key);
+  if(!inp) return;
+  const text = inp.value.trim();
+  if(!text){ toast('Please enter a task description'); return; }
+  const tasks = getCustomTasks(key);
+  tasks.push({ t: text, f: 'Custom' });
+  saveCustomTasks(key, tasks);
+  inp.value = '';
+  buildChecklist(key);
+  toast('Task added ✓');
+}
+
+function removeCustomTask(key, idx){
+  const tasks = getCustomTasks(key);
+  tasks.splice(idx, 1);
+  saveCustomTasks(key, tasks);
+  // Also remove its saved check state
+  buildChecklist(key);
+  toast('Task removed');
+}
+
+/* ════════ CHECKLISTS ════════ */
+function buildAllChecklists(){
+  Object.keys(CHECKLISTS).forEach(key => buildChecklist(key));
+}
+function buildChecklist(key){
+  const el = document.getElementById('cl-'+key);
+  if(!el) return;
+  const saved = JSON.parse(localStorage.getItem('cl-'+key)||'{}');
+  const custom = getCustomTasks(key);
+  let h = '';
+
+  // Built-in tasks
+  CHECKLISTS[key].forEach(sec => {
+    h += `<div class="cl-section">${sec.section}</div>`;
+    sec.tasks.forEach(task => {
+      const id = 'c-'+key+'-'+hashStr(task.t);
+      const chk = !!saved[id];
+      h += `<div class="cl-item">
+        <input type="checkbox" id="${id}" ${chk?'checked':''} onchange="saveChk('${key}','${id}',this.checked)">
+        <label class="cl-label${chk?' done':''}" for="${id}">${task.t}</label>
+        <span class="freq-tag">${task.f}</span>
+      </div>`;
+    });
+  });
+
+  // Custom tasks section
+  if(custom.length){
+    h += `<div class="cl-section">CUSTOM TASKS</div>`;
+    custom.forEach((task, idx) => {
+      const id = 'c-'+key+'-custom-'+idx;
+      const chk = !!saved[id];
+      h += `<div class="cl-item">
+        <input type="checkbox" id="${id}" ${chk?'checked':''} onchange="saveChk('${key}','${id}',this.checked)">
+        <label class="cl-label${chk?' done':''}" for="${id}">${task.t}</label>
+        <span class="freq-tag" style="background:rgba(192,57,43,0.08);color:var(--accent);">${task.f}</span>
+        <button onclick="removeCustomTask('${key}',${idx})" title="Remove this task" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:0.85rem;padding:0 4px;line-height:1;flex-shrink:0;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">✕</button>
+      </div>`;
+    });
+  }
+
+  el.innerHTML = h;
+  updateProg(key);
+}
+function hashStr(s){ let h=0; for(let i=0;i<s.length;i++) h=(Math.imul(31,h)+s.charCodeAt(i))|0; return Math.abs(h).toString(36); }
+function saveChk(key,id,val){
+  const s = JSON.parse(localStorage.getItem('cl-'+key)||'{}');
+  s[id]=val;
+  localStorage.setItem('cl-'+key,JSON.stringify(s));
+  const lbl=document.querySelector(`label[for="${id}"]`);
+  if(lbl) lbl.classList.toggle('done',val);
+  updateProg(key);
+  updateDash();
+  syncChecklist(key);
+}
+function chkAll(key,val){
+  const s=JSON.parse(localStorage.getItem('cl-'+key)||'{}');
+  document.querySelectorAll(`#cl-${key} input[type=checkbox]`).forEach(cb=>{
+    cb.checked=val; s[cb.id]=val;
+    const lbl=document.querySelector(`label[for="${cb.id}"]`);
+    if(lbl) lbl.classList.toggle('done',val);
+  });
+  localStorage.setItem('cl-'+key,JSON.stringify(s));
+  updateProg(key);
+  updateDash();
+  syncChecklist(key);
+}
+function updateProg(key){
+  const boxes=document.querySelectorAll(`#cl-${key} input[type=checkbox]`);
+  if(!boxes.length) return;
+  let done=0; boxes.forEach(b=>{ if(b.checked) done++; });
+  const el=document.getElementById('prog-'+key);
+  if(el) el.textContent=`${done} / ${boxes.length} tasks completed`;
+}
+function getChkPct(key){
+  const boxes=document.querySelectorAll(`#cl-${key} input[type=checkbox]`);
+  if(!boxes.length) return '0%';
+  let done=0; boxes.forEach(b=>{ if(b.checked) done++; });
+  return Math.round(done/boxes.length*100)+'%';
+}
+
+/* ════════ REQUISITION ════════ */
+let _activeCat = 'consumables';
+
+function showSupplier(cat, el, fromNav) {
+  _activeCat = cat;
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if(el) el.classList.add('active');
+  else document.querySelectorAll('.nav-item').forEach(n=>{
+    if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+cat+"'")) n.classList.add('active');
+  });
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-requisition').classList.add('active');
+  const sup = SUPPLIERS[cat];
+  const savedName = localStorage.getItem('sup-name-'+cat) || sup.name;
+  document.getElementById('rq-page-title').textContent = savedName;
+  document.getElementById('rq-page-sub').textContent = 'Requisition — enter quantities and send via WhatsApp';
+  buildRequisition(cat);
+  if(!fromNav && !_navSkip){
+    _navHistory = _navHistory.slice(0, _navPos + 1);
+    _navHistory.push('supplier:'+cat);
+    _navPos = _navHistory.length - 1;
+    _updateNavBtns();
+  }
+}
+
+function buildRequisition(cat){
+  if(!cat) cat = _activeCat;
+  const container = document.getElementById('rq-suppliers');
+  container.innerHTML = '';
+  const sup = SUPPLIERS[cat];
+  const savedName = localStorage.getItem('sup-name-'+cat) || sup.name;
+  const savedNum  = localStorage.getItem('sup-num-'+cat) || '';
+  const div = document.createElement('div');
+  div.innerHTML = `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border);">
+        <div>
+          <div class="card-t" style="margin-bottom:4px;">Supplier Details</div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <input type="text" id="sname-${cat}" value="${savedName}" style="width:220px;padding:7px 10px;font-size:0.82rem;" oninput="localStorage.setItem('sup-name-${cat}',this.value);document.getElementById('rq-page-title').textContent=this.value;syncSupplierSettings('${cat}');" placeholder="Supplier name">
+            <input type="text" id="snum-${cat}" value="${savedNum}" style="width:180px;padding:7px 10px;font-size:0.82rem;" oninput="localStorage.setItem('sup-num-${cat}',this.value);syncSupplierSettings('${cat}')" placeholder="WhatsApp number">
+          </div>
+        </div>
+        <button class="btn btn-wa" onclick="openWA('${cat}')">📱 Send via WhatsApp</button>
+      </div>
+      <div class="tbl-wrap">
+        <table id="tbl-${cat}">
+          <thead><tr><th style="width:50%">Item</th><th style="width:18%">Qty</th><th style="width:16%">Unit</th></tr></thead>
+          <tbody id="tbody-${cat}"></tbody>
+        </table>
+      </div>
+    </div>`;
+  container.appendChild(div);
+  buildRqItems(cat);
+}
+function buildRqItems(cat){
+  const tbody = document.getElementById('tbody-'+cat);
+  if(!tbody) return;
+  const savedQty  = JSON.parse(localStorage.getItem('rq-'+cat)||'{}');
+  const savedUnit = JSON.parse(localStorage.getItem('rq-unit-'+cat)||'{}');
+  let h = '';
+  SUPPLIERS[cat].items.forEach(item => {
+    const k = hashStr(item);
+    const qty  = savedQty[k]  || '';
+    const unit = savedUnit[k] || 'pcs';
+    h += `<tr>
+      <td>${item}</td>
+      <td><input type="number" class="qty-inp" min="0" value="${qty}" placeholder="—"
+           oninput="saveRq('${cat}','${k}',this.value)"></td>
+      <td>
+        <select onchange="saveUnit('${cat}','${k}',this.value)" style="padding:5px 8px;font-size:0.73rem;">
+          <option value="pcs"${unit==='pcs'?' selected':''}>pcs</option>
+          <option value="bottle"${unit==='bottle'?' selected':''}>bottle</option>
+          <option value="kg"${unit==='kg'?' selected':''}>kg</option>
+          <option value="box"${unit==='box'?' selected':''}>box</option>
+          <option value="case"${unit==='case'?' selected':''}>case</option>
+          <option value="L"${unit==='L'?' selected':''}>L</option>
+          <option value="ctn"${unit==='ctn'?' selected':''}>ctn</option>
+        </select>
+      </td>
+    </tr>`;
+  });
+  tbody.innerHTML = h;
+}
+function saveRq(cat,k,val){
+  const s=JSON.parse(localStorage.getItem('rq-'+cat)||'{}');
+  if(val&&parseFloat(val)>0) s[k]=val; else delete s[k];
+  localStorage.setItem('rq-'+cat,JSON.stringify(s));
+}
+function saveUnit(cat,k,val){
+  const s=JSON.parse(localStorage.getItem('rq-unit-'+cat)||'{}');
+  s[k]=val; localStorage.setItem('rq-unit-'+cat,JSON.stringify(s));
+}
+function clearSupplierQtys(){
+  if(!confirm('Clear all quantities for this supplier?')) return;
+  localStorage.removeItem('rq-'+_activeCat);
+  document.querySelectorAll(`#tbody-${_activeCat} .qty-inp`).forEach(i=>i.value='');
+  toast('Quantities cleared');
+}
+
+/* ════════ WHATSAPP ════════ */
+let _waCat='';
+function openWA(cat){
+  _waCat=cat;
+  const savedQty  = JSON.parse(localStorage.getItem('rq-'+cat)||'{}');
+  const savedUnit = JSON.parse(localStorage.getItem('rq-unit-'+cat)||'{}');
+  const date = document.getElementById('req-date').value || new Date().toISOString().split('T')[0];
+  const by   = document.getElementById('req-by').value || '';
+  const sname= localStorage.getItem('sup-name-'+cat) || SUPPLIERS[cat].name;
+  const snum = localStorage.getItem('sup-num-'+cat) || '';
+  document.getElementById('wa-sname').value = sname;
+  document.getElementById('wa-num').value   = snum;
+  let lines=[`🍽️ *Good Thing — Requisition*\n📅 ${date}${by?' | Requested by: '+by:''}\n`];
+  let has=false;
+  SUPPLIERS[cat].items.forEach(item=>{
+    const k=hashStr(item);
+    const qty=savedQty[k];
+    const unit=savedUnit[k]||'pcs';
+    if(qty&&parseFloat(qty)>0){ lines.push(`• ${item}: *${qty} ${unit}*`); has=true; }
+  });
+  if(!has){ toast('No quantities entered for this supplier'); return; }
+  document.getElementById('wa-preview').textContent=lines.join('\n');
+  document.getElementById('wa-modal').classList.add('open');
+}
+function doWA(){
+  const sname=document.getElementById('wa-sname').value;
+  const num=document.getElementById('wa-num').value.replace(/\s+/g,'').replace(/[^+\d]/g,'').replace('+','');
+  const text=document.getElementById('wa-preview').textContent;
+  if(sname) localStorage.setItem('sup-name-'+_waCat,sname);
+  if(num) localStorage.setItem('sup-num-'+_waCat,'+'+num);
+
+  // Sync requisition to cloud
+  const date = document.getElementById('req-date').value || new Date().toISOString().split('T')[0];
+  const by = document.getElementById('req-by').value || '';
+  const savedQty = JSON.parse(localStorage.getItem('rq-'+_waCat)||'{}');
+  const savedUnit = JSON.parse(localStorage.getItem('rq-unit-'+_waCat)||'{}');
+  syncRequisition(_waCat, date, by, savedQty, savedUnit);
+
+  const url=num?`https://wa.me/${num}?text=${encodeURIComponent(text)}`:`https://wa.me/?text=${encodeURIComponent(text)}`;
+  window.open(url,'_blank');
+}
+function closeWA(){ document.getElementById('wa-modal').classList.remove('open'); }
+
+/* ════════ WASTAGE ════════ */
+function buildWastage(){
+  ['kitchen','bar','floor'].forEach(dept=>{
+    const saved=JSON.parse(localStorage.getItem('ws-'+dept)||'[]');
+    renderWastage(dept, saved.length?saved:[{i:'',u:'',q:'',r:''}]);
+  });
+}
+function renderWastage(dept,rows){
+  const card=document.getElementById('wsc-'+dept);
+  const lbl=dept.charAt(0).toUpperCase()+dept.slice(1);
+  let h=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+    <div class="card-t" style="margin:0;">${lbl} Wastage & Complimentary Sheet</div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-o btn-sm" onclick="addWRow('${dept}')">+ Add Row</button>
+      <button class="btn btn-p btn-sm" onclick="saveWastage('${dept}')">Save</button>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:2fr 90px 80px 2fr 36px;gap:8px;margin-bottom:8px;">
+    <label style="font-size:0.6rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);">Item Description</label>
+    <label style="font-size:0.6rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);">Unit</label>
+    <label style="font-size:0.6rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);">Qty</label>
+    <label style="font-size:0.6rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);">Reason</label>
+    <span></span>
+  </div>
+  <div id="wrows-${dept}">`;
+  rows.forEach((r,i)=>{ h+=wRow(dept,i,r); });
+  const meta=JSON.parse(localStorage.getItem('ws-meta-'+dept)||'{}');
+  h+=`</div>
+  <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:14px;flex-wrap:wrap;">
+    <div class="fg" style="margin:0;flex:1;min-width:130px;"><label>Chef's / Responsible Name</label><input type="text" id="wn-${dept}" value="${meta.name||''}" placeholder="Name"></div>
+    <div class="fg" style="margin:0;width:150px;"><label>Date</label><input type="date" id="wd-${dept}" value="${meta.date||new Date().toISOString().split('T')[0]}"></div>
+  </div>`;
+  card.innerHTML=h;
+}
+function wRow(dept,i,r){
+  return `<div id="wr-${dept}-${i}" style="display:grid;grid-template-columns:2fr 90px 80px 2fr 36px;gap:8px;margin-bottom:8px;align-items:center;">
+    <input type="text" placeholder="Item description" value="${r.i||''}" oninput="updW('${dept}',${i},'i',this.value)">
+    <input type="text" placeholder="kg / pcs" value="${r.u||''}" oninput="updW('${dept}',${i},'u',this.value)">
+    <input type="number" placeholder="0" value="${r.q||''}" min="0" oninput="updW('${dept}',${i},'q',this.value)">
+    <input type="text" placeholder="Reason" value="${r.r||''}" oninput="updW('${dept}',${i},'r',this.value)">
+    <button class="btn btn-o btn-xs" style="padding:4px 7px;color:var(--muted);" onclick="rmWRow('${dept}',${i})">✕</button>
+  </div>`;
+}
+function getW(dept){ return JSON.parse(localStorage.getItem('ws-'+dept)||'[{}]'); }
+function updW(dept,i,field,val){ const r=getW(dept); if(!r[i])r[i]={}; r[i][field]=val; localStorage.setItem('ws-'+dept,JSON.stringify(r)); updateDash(); }
+function addWRow(dept){
+  const rows=getW(dept); rows.push({i:'',u:'',q:'',r:''});
+  localStorage.setItem('ws-'+dept,JSON.stringify(rows));
+  const c=document.getElementById('wrows-'+dept);
+  const d=document.createElement('div');
+  d.innerHTML=wRow(dept,rows.length-1,{});
+  c.appendChild(d.firstElementChild);
+}
+function rmWRow(dept,i){ const r=getW(dept); r.splice(i,1); localStorage.setItem('ws-'+dept,JSON.stringify(r)); renderWastage(dept,r.length?r:[{}]); }
+function saveWastage(dept){
+  const meta={name:document.getElementById('wn-'+dept)?.value||'',date:document.getElementById('wd-'+dept)?.value||''};
+  localStorage.setItem('ws-meta-'+dept,JSON.stringify(meta));
+  toast('Wastage saved'); updateDash();
+  syncWastage(dept);
+}
+
+/* ════════ TIPS ════════ */
+function buildTips(){
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('tips-date').value = today;
+  loadTipsForDate(today);
+}
+
+function loadTipsForDate(date){
+  if(!date) return;
+  document.getElementById('tips-date').value = date;
+  // Load saved day record if exists, else load staff template + empty pool
+  const saved = JSON.parse(localStorage.getItem('tips-day-'+date)||'null');
+  const staff = saved ? saved.staff : (JSON.parse(localStorage.getItem('tips-staff')||'null')||DEFAULT_STAFF);
+  const pool  = saved ? saved.pool  : '';
+  const tbody = document.getElementById('tips-body');
+  tbody.innerHTML = '';
+  staff.forEach((s,i) => addTipsRowEl(s,i));
+  document.getElementById('tips-pool').value = pool;
+  const status = document.getElementById('tips-save-status');
+  if(saved){
+    status.textContent = '✓ Saved on ' + new Date(saved.savedAt).toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    status.style.color = '#2ecc71';
+  } else {
+    status.textContent = 'Not yet saved for this date';
+    status.style.color = 'var(--muted)';
+  }
+  calcTips();
+}
+
+function saveTipsDay(){
+  const date  = document.getElementById('tips-date').value;
+  const pool  = parseFloat(document.getElementById('tips-pool').value)||0;
+  const staff = JSON.parse(localStorage.getItem('tips-staff')||'null')||DEFAULT_STAFF;
+  if(!date){ toast('Please select a date'); return; }
+  if(!pool){ toast('Please enter a tips amount'); return; }
+
+  // Build results snapshot
+  const totalShares = staff.reduce((a,s)=>a+(parseFloat(s.shares)||0),0);
+  const perShare    = totalShares>0 ? pool/totalShares : 0;
+  const results     = staff.map(s=>({
+    ...s,
+    total: Math.max(0,(perShare*(parseFloat(s.shares)||0))-(parseFloat(s.ded)||0)-(parseFloat(s.with)||0))
+  }));
+
+  const record = { date, pool, staff: results, perShare, totalShares, savedAt: new Date().toISOString() };
+  localStorage.setItem('tips-day-'+date, JSON.stringify(record));
+
+  // Update index
+  const idx = JSON.parse(localStorage.getItem('tips-index')||'[]');
+  if(!idx.includes(date)) idx.push(date);
+  idx.sort().reverse();
+  localStorage.setItem('tips-index', JSON.stringify(idx));
+
+  const status = document.getElementById('tips-save-status');
+  status.textContent = '✓ Saved — ' + new Date().toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  status.style.color = '#2ecc71';
+  toast('Tips saved for '+date);
+  syncTips(record);
+}
+
+function loadTipsHistory(){
+  const monthFilter = document.getElementById('tips-hist-month')?.value || '';
+  const idx = JSON.parse(localStorage.getItem('tips-index')||'[]');
+  const filtered = monthFilter ? idx.filter(d=>d.startsWith(monthFilter)) : idx;
+  const el = document.getElementById('tips-history-list');
+
+  if(!filtered.length){
+    el.innerHTML = `<p style="font-size:0.82rem;color:var(--muted);padding:20px 0;text-align:center;">No saved records${monthFilter?' for this month':''}.</p>`;
+    return;
+  }
+
+  // Summary stats for filtered period
+  let totalPool = 0;
+  filtered.forEach(d=>{ const r=JSON.parse(localStorage.getItem('tips-day-'+d)||'null'); if(r) totalPool+=r.pool; });
+
+  let h = `<div style="display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap;">
+    <div class="card" style="flex:1;min-width:140px;padding:14px;">
+      <div style="font-family:'Cormorant Garamond',serif;font-size:1.7rem;font-weight:300;color:var(--accent);">$${totalPool.toFixed(0)}</div>
+      <div style="font-size:0.6rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);margin-top:2px;">Total Tips${monthFilter?' This Month':''}</div>
+    </div>
+    <div class="card" style="flex:1;min-width:140px;padding:14px;">
+      <div style="font-family:'Cormorant Garamond',serif;font-size:1.7rem;font-weight:300;">${filtered.length}</div>
+      <div style="font-size:0.6rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);margin-top:2px;">Days Recorded</div>
+    </div>
+    <div class="card" style="flex:1;min-width:140px;padding:14px;">
+      <div style="font-family:'Cormorant Garamond',serif;font-size:1.7rem;font-weight:300;">$${filtered.length?(totalPool/filtered.length).toFixed(0):0}</div>
+      <div style="font-size:0.6rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);margin-top:2px;">Avg Per Day</div>
+    </div>
+  </div>
+  <table style="width:100%;border-collapse:collapse;font-size:0.81rem;">
+    <thead><tr>
+      <th style="text-align:left;padding:9px 12px;font-size:0.6rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);font-weight:400;border-bottom:2px solid var(--border);">Date</th>
+      <th style="text-align:left;padding:9px 12px;font-size:0.6rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);font-weight:400;border-bottom:2px solid var(--border);">Pool</th>
+      <th style="text-align:left;padding:9px 12px;font-size:0.6rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);font-weight:400;border-bottom:2px solid var(--border);">Per Share</th>
+      <th style="text-align:left;padding:9px 12px;font-size:0.6rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);font-weight:400;border-bottom:2px solid var(--border);">Staff</th>
+      <th style="padding:9px 12px;border-bottom:2px solid var(--border);"></th>
+    </tr></thead>
+    <tbody>`;
+
+  filtered.forEach(date => {
+    const r = JSON.parse(localStorage.getItem('tips-day-'+date)||'null');
+    if(!r) return;
+    const d = new Date(date+'T00:00:00');
+    const dStr = d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+    const staffNames = r.staff.filter(s=>s.name).map(s=>s.name).join(', ');
+    h += `<tr style="cursor:pointer;" onclick="jumpToTipsDate('${date}')" title="Click to load this day">
+      <td style="padding:10px 12px;border-bottom:1px solid var(--border);font-weight:400;">${dStr}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid var(--border);font-family:'Cormorant Garamond',serif;font-size:1.05rem;color:var(--accent);">$${r.pool.toFixed(2)}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid var(--border);">$${r.perShare.toFixed(2)}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid var(--border);font-size:0.75rem;color:var(--muted);">${staffNames}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid var(--border);">
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-o btn-xs" onclick="event.stopPropagation();expandTipsRow('${date}',this)">View</button>
+          <button class="btn btn-xs" style="background:rgba(192,57,43,0.08);color:var(--accent);border:none;cursor:pointer;padding:4px 9px;font-family:'Jost',sans-serif;font-size:0.6rem;letter-spacing:0.1em;border-radius:2px;" onclick="event.stopPropagation();deleteTipsDay('${date}')">Delete</button>
+        </div>
+      </td>
+    </tr>
+    <tr id="tips-expand-${date}" style="display:none;">
+      <td colspan="5" style="padding:0;border-bottom:1px solid var(--border);">
+        <div id="tips-expand-inner-${date}" style="padding:12px 16px;background:var(--panel2);"></div>
+      </td>
+    </tr>`;
+  });
+
+  h += '</tbody></table>';
+  el.innerHTML = h;
+}
+
+function expandTipsRow(date, btn){
+  const row = document.getElementById('tips-expand-'+date);
+  const inner = document.getElementById('tips-expand-inner-'+date);
+  if(row.style.display === 'table-row'){
+    row.style.display = 'none';
+    btn.textContent = 'View';
+    return;
+  }
+  const r = JSON.parse(localStorage.getItem('tips-day-'+date)||'null');
+  if(!r){ inner.innerHTML='<p style="color:var(--muted);font-size:0.8rem;">No data</p>'; }
+  else {
+    let h = `<table style="width:100%;font-size:0.79rem;border-collapse:collapse;">
+      <thead><tr>
+        <th style="text-align:left;padding:6px 8px;color:var(--muted);font-size:0.6rem;letter-spacing:0.14em;text-transform:uppercase;font-weight:400;">Name</th>
+        <th style="text-align:left;padding:6px 8px;color:var(--muted);font-size:0.6rem;letter-spacing:0.14em;text-transform:uppercase;font-weight:400;">Position</th>
+        <th style="text-align:left;padding:6px 8px;color:var(--muted);font-size:0.6rem;letter-spacing:0.14em;text-transform:uppercase;font-weight:400;">Shares</th>
+        <th style="text-align:left;padding:6px 8px;color:var(--muted);font-size:0.6rem;letter-spacing:0.14em;text-transform:uppercase;font-weight:400;">Deduction</th>
+        <th style="text-align:left;padding:6px 8px;color:var(--muted);font-size:0.6rem;letter-spacing:0.14em;text-transform:uppercase;font-weight:400;">Withdraw</th>
+        <th style="text-align:left;padding:6px 8px;color:var(--muted);font-size:0.6rem;letter-spacing:0.14em;text-transform:uppercase;font-weight:400;">Total</th>
+      </tr></thead><tbody>`;
+    r.staff.forEach(s=>{
+      h+=`<tr>
+        <td style="padding:6px 8px;border-top:1px solid var(--border);">${s.name||'—'}</td>
+        <td style="padding:6px 8px;border-top:1px solid var(--border);color:var(--muted);">${s.pos||'—'}</td>
+        <td style="padding:6px 8px;border-top:1px solid var(--border);">${s.shares}</td>
+        <td style="padding:6px 8px;border-top:1px solid var(--border);">$${(s.ded||0).toFixed(2)}</td>
+        <td style="padding:6px 8px;border-top:1px solid var(--border);">$${(s.with||0).toFixed(2)}</td>
+        <td style="padding:6px 8px;border-top:1px solid var(--border);font-family:'Cormorant Garamond',serif;font-size:1rem;color:var(--accent);font-weight:400;">$${(s.total||0).toFixed(2)}</td>
+      </tr>`;
+    });
+    h += `</tbody></table>
+      <div style="margin-top:10px;font-size:0.72rem;color:var(--muted);">Total pool: <strong style="color:var(--dark);">$${r.pool.toFixed(2)}</strong> &nbsp;·&nbsp; Per share: <strong style="color:var(--dark);">$${r.perShare.toFixed(2)}</strong></div>`;
+    inner.innerHTML = h;
+  }
+  row.style.display = 'table-row';
+  btn.textContent = 'Hide';
+}
+
+function jumpToTipsDate(date){
+  // Switch to today tab and load that date
+  document.querySelectorAll('.tips-tab').forEach(t=>t.style.display='none');
+  document.getElementById('tips-tab-today').style.display='block';
+  document.querySelectorAll('#page-tips .tab').forEach(t=>t.classList.remove('active'));
+  document.querySelector('#page-tips .tab:first-child').classList.add('active');
+  loadTipsForDate(date);
+}
+
+function deleteTipsDay(date){
+  if(!confirm('Delete tips record for '+date+'?')) return;
+  localStorage.removeItem('tips-day-'+date);
+  const idx = JSON.parse(localStorage.getItem('tips-index')||'[]').filter(d=>d!==date);
+  localStorage.setItem('tips-index',JSON.stringify(idx));
+  loadTipsHistory();
+  toast('Deleted record for '+date);
+}
+
+function addTipsRow(){
+  const staff=JSON.parse(localStorage.getItem('tips-staff')||'null')||[];
+  staff.push({name:'',pos:'',shares:1,ded:0,with:0});
+  localStorage.setItem('tips-staff',JSON.stringify(staff));
+  addTipsRowEl({name:'',pos:'',shares:1,ded:0,with:0},staff.length-1);
+  calcTips();
+}
+function addTipsRowEl(s,i){
+  const tbody=document.getElementById('tips-body');
+  const tr=document.createElement('tr');
+  tr.id='tr-'+i;
+  tr.innerHTML=`
+    <td><input type="text" value="${s.name||''}" style="padding:5px 8px;font-size:0.79rem;" oninput="updStaff(${i},'name',this.value)"></td>
+    <td><input type="text" value="${s.pos||''}" style="padding:5px 8px;font-size:0.79rem;" oninput="updStaff(${i},'pos',this.value)"></td>
+    <td><input type="number" value="${s.shares}" min="0" step="0.5" style="padding:5px 8px;font-size:0.79rem;width:68px;" oninput="updStaff(${i},'shares',parseFloat(this.value)||0)"></td>
+    <td><input type="number" value="${s.ded||0}" min="0" step="0.01" style="padding:5px 8px;font-size:0.79rem;width:88px;" oninput="updStaff(${i},'ded',parseFloat(this.value)||0)"></td>
+    <td><input type="number" value="${s.with||0}" min="0" step="0.01" style="padding:5px 8px;font-size:0.79rem;width:88px;" oninput="updStaff(${i},'with',parseFloat(this.value)||0)"></td>
+    <td id="tres-${i}" class="tips-result">—</td>
+    <td><button class="btn btn-o btn-xs" onclick="rmStaff(${i})">✕</button></td>`;
+  tbody.appendChild(tr);
+}
+function updStaff(i,field,val){
+  const s=JSON.parse(localStorage.getItem('tips-staff')||'null')||DEFAULT_STAFF;
+  s[i][field]=val; localStorage.setItem('tips-staff',JSON.stringify(s)); calcTips();
+}
+function rmStaff(i){
+  const s=JSON.parse(localStorage.getItem('tips-staff')||'null')||DEFAULT_STAFF;
+  s.splice(i,1); localStorage.setItem('tips-staff',JSON.stringify(s));
+  document.getElementById('tips-body').innerHTML='';
+  s.forEach((st,idx)=>addTipsRowEl(st,idx)); calcTips();
+}
+function calcTips(){
+  const pool=parseFloat(document.getElementById('tips-pool').value)||0;
+  localStorage.setItem('tips-pool-val',pool);
+  const staff=JSON.parse(localStorage.getItem('tips-staff')||'null')||DEFAULT_STAFF;
+  const totalShares=staff.reduce((a,s)=>a+(parseFloat(s.shares)||0),0);
+  const perShare=totalShares>0?pool/totalShares:0;
+  document.getElementById('ts-total').textContent=totalShares;
+  document.getElementById('ts-perval').textContent='$'+perShare.toFixed(2);
+  staff.forEach((s,i)=>{
+    const amt=(perShare*(parseFloat(s.shares)||0))-(parseFloat(s.ded)||0)-(parseFloat(s.with)||0);
+    const c=document.getElementById('tres-'+i);
+    if(c) c.textContent=pool>0?'$'+Math.max(0,amt).toFixed(2):'—';
+  });
+  updateDash();
+}
+
+/* ════════ HISTORY PAGE ════════ */
+async function loadHistory(){
+  if(!SUPABASE_CONFIGURED){
+    document.getElementById('history-content').innerHTML = '<div class="history-empty">Cloud sync not configured. Please set SUPABASE_URL and SUPABASE_KEY in the script.</div>';
+    return;
+  }
+  const btn = document.getElementById('hist-load-btn');
+  btn.classList.add('btn-loading');
+  btn.textContent = '⟳ Loading...';
+
+  const from = document.getElementById('hist-from').value;
+  const to = document.getElementById('hist-to').value;
+  if(!from || !to){
+    toast('Please select date range');
+    btn.classList.remove('btn-loading');
+    btn.textContent = 'Load History';
+    return;
+  }
+
+  try {
+    const [chklists, wastes, tiplist, reqs] = await Promise.all([
+      supabase.from('checklists').select('*').gte('date',from).lte('date',to),
+      supabase.from('wastage_logs').select('*').gte('date',from).lte('date',to),
+      supabase.from('tips').select('*').gte('date',from).lte('date',to),
+      supabase.from('requisitions').select('*').gte('date',from).lte('date',to),
+    ]);
+
+    let html = '<div class="tabs" style="margin-bottom:20px;">';
+    html += `<button class="tab active" onclick="swTab('hist','all',this)">All</button>`;
+    html += `<button class="tab" onclick="swTab('hist','checklists',this)">Checklists</button>`;
+    html += `<button class="tab" onclick="swTab('hist','wastage',this)">Wastage</button>`;
+    html += `<button class="tab" onclick="swTab('hist','tips',this)">Tips</button>`;
+    html += `<button class="tab" onclick="swTab('hist','requisitions',this)">Requisitions</button>`;
+    html += '</div>';
+
+    // ALL tab
+    html += '<div id="hist-all" class="hist-tab active">';
+    html += renderChecklistHistory(chklists.data||[]);
+    html += renderWastageHistory(wastes.data||[]);
+    html += renderTipsHistory(tiplist.data||[]);
+    html += renderRequisitionHistory(reqs.data||[]);
+    html += '</div>';
+
+    // Checklists tab
+    html += '<div id="hist-checklists" class="hist-tab" style="display:none;">';
+    html += renderChecklistHistory(chklists.data||[]);
+    html += '</div>';
+
+    // Wastage tab
+    html += '<div id="hist-wastage" class="hist-tab" style="display:none;">';
+    html += renderWastageHistory(wastes.data||[]);
+    html += '</div>';
+
+    // Tips tab
+    html += '<div id="hist-tips" class="hist-tab" style="display:none;">';
+    html += renderTipsHistory(tiplist.data||[]);
+    html += '</div>';
+
+    // Requisitions tab
+    html += '<div id="hist-requisitions" class="hist-tab" style="display:none;">';
+    html += renderRequisitionHistory(reqs.data||[]);
+    html += '</div>';
+
+    document.getElementById('history-content').innerHTML = html;
+    btn.classList.remove('btn-loading');
+    btn.textContent = 'Load History';
+  } catch(e){
+    console.error('History load failed:',e);
+    document.getElementById('history-content').innerHTML = '<div class="history-empty">Error loading history.</div>';
+    btn.classList.remove('btn-loading');
+    btn.textContent = 'Load History';
+  }
+}
+
+function renderChecklistHistory(data){
+  if(!data.length) return '<div class="history-section"><h3>Checklists</h3><p class="history-empty">No records found.</p></div>';
+  let h = '<div class="history-section"><h3>Checklists</h3>';
+  h += '<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Checklist</th><th>Completion</th><th>Waiter</th><th>Manager</th></tr></thead><tbody>';
+  data.forEach(r=>{
+    const dateStr = new Date(r.date+'T00:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+    const state = r.state || {};
+    const total = Object.keys(state).length;
+    const done = Object.values(state).filter(Boolean).length;
+    const pct = total ? Math.round(done/total*100) : 0;
+    h += `<tr>
+      <td>${dateStr}</td>
+      <td><span class="sup-badge">${r.checklist_key.replace('-',' ').toUpperCase()}</span></td>
+      <td>${pct}%</td>
+      <td>${r.waiter||'—'}</td>
+      <td>${r.manager||'—'}</td>
+    </tr>`;
+  });
+  h += '</tbody></table></div></div>';
+  return h;
+}
+
+function renderWastageHistory(data){
+  if(!data.length) return '<div class="history-section"><h3>Wastage</h3><p class="history-empty">No records found.</p></div>';
+  let h = '<div class="history-section"><h3>Wastage</h3>';
+  h += '<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Department</th><th>Items</th><th>Responsible</th></tr></thead><tbody>';
+  data.forEach(r=>{
+    const dateStr = new Date(r.date+'T00:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+    const itemCount = (r.rows||[]).filter(x=>x.i).length;
+    const items = (r.rows||[]).filter(x=>x.i).map(x=>x.i).slice(0,3).join(', ');
+    h += `<tr>
+      <td>${dateStr}</td>
+      <td><strong>${r.dept}</strong></td>
+      <td>${items}${itemCount>3?' +'+(itemCount-3)+' more':''}  (${itemCount} items)</td>
+      <td>${r.responsible_name||'—'}</td>
+    </tr>`;
+  });
+  h += '</tbody></table></div></div>';
+  return h;
+}
+
+function renderTipsHistory(data){
+  if(!data.length) return '<div class="history-section"><h3>Tips</h3><p class="history-empty">No records found.</p></div>';
+  let h = '<div class="history-section"><h3>Tips Division</h3>';
+  h += '<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Pool</th><th>Per Share</th><th>Staff Count</th><th>Total Shares</th></tr></thead><tbody>';
+  data.forEach(r=>{
+    const dateStr = new Date(r.date+'T00:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+    const staffCount = (r.staff||[]).length;
+    h += `<tr>
+      <td>${dateStr}</td>
+      <td style="font-family:'Cormorant Garamond',serif;color:var(--accent);font-weight:400;">$${r.pool.toFixed(2)}</td>
+      <td>$${r.per_share.toFixed(2)}</td>
+      <td>${staffCount}</td>
+      <td>${r.total_shares}</td>
+    </tr>`;
+  });
+  h += '</tbody></table></div></div>';
+  return h;
+}
+
+function renderRequisitionHistory(data){
+  if(!data.length) return '<div class="history-section"><h3>Requisitions</h3><p class="history-empty">No records found.</p></div>';
+  let h = '<div class="history-section"><h3>Requisitions</h3>';
+  h += '<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Supplier</th><th>Items Ordered</th><th>Requested By</th></tr></thead><tbody>';
+  data.forEach(r=>{
+    const dateStr = new Date(r.date+'T00:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+    const itemCount = Object.keys(r.quantities||{}).length;
+    h += `<tr>
+      <td>${dateStr}</td>
+      <td><strong>${r.supplier}</strong></td>
+      <td>${itemCount} items</td>
+      <td>${r.requested_by||'—'}</td>
+    </tr>`;
+  });
+  h += '</tbody></table></div></div>';
+  return h;
+}
+
+/* ════════ DASHBOARD ════════ */
+function updateDash(){
+  document.getElementById('d-foh-open').textContent  = getChkPct('foh-open');
+  document.getElementById('d-foh-close').textContent = getChkPct('foh-close');
+  document.getElementById('d-bar-open').textContent  = getChkPct('bar-open');
+  let wc=0;
+  ['kitchen','bar','floor'].forEach(d=>{ const r=JSON.parse(localStorage.getItem('ws-'+d)||'[]'); wc+=r.filter(x=>x.i).length; });
+  document.getElementById('d-wastage').textContent=wc;
+}
+
+/* ════════ TOAST ════════ */
+/* ════════ DATABASE SETUP ════════ */
+async function runDatabaseSetup(){
+  const btn = document.getElementById('db-setup-btn');
+  const log = document.getElementById('db-setup-log');
+  btn.classList.add('btn-loading');
+  btn.textContent = '\u29d1 Checking\u2026';
+  log.style.display = 'block';
+  log.innerHTML = '';
+
+  function dbLog(msg, type){
+    type = type || 'info';
+    var colors = {ok:'#27ae60', warn:'var(--accent)', info:'var(--muted)', head:'var(--dark)'};
+    log.innerHTML += '<div style="color:' + (colors[type]||colors.info) + ';">' + msg + '</div>';
+    log.scrollTop = log.scrollHeight;
+  }
+
+  if(!_sbClient){
+    dbLog('\u2717 Not connected to Supabase. Please wait a moment and try again.', 'warn');
+    btn.classList.remove('btn-loading');
+    btn.textContent = '\u2699 Setup Database Tables';
+    return;
+  }
+
+  dbLog('Supabase project: cciaetarrwltmbnrdpsp', 'head');
+  dbLog('Checking all 6 tables\u2026', 'info');
+  dbLog('', 'info');
+
+  var tables = [
+    {name:'checklists',        desc:'Checklist progress'},
+    {name:'wastage_logs',      desc:'Wastage entries'},
+    {name:'tips',              desc:'Tips division'},
+    {name:'supplier_settings', desc:'Supplier names'},
+    {name:'requisitions',      desc:'Order requisitions'},
+    {name:'daily_sales',       desc:'Daily sales data'},
+  ];
+
+  var missing = [];
+
+  for(var i=0; i<tables.length; i++){
+    var t = tables[i];
+    try {
+      var result = await _sbClient.from(t.name).select('id').limit(1);
+      if(!result.error){
+        dbLog('  \u2713  ' + t.name + ' \u2014 ' + t.desc, 'ok');
+      } else if(result.error.code === '42P01' || (result.error.message && result.error.message.includes('exist'))){
+        dbLog('  \u2717  ' + t.name + ' \u2014 NOT FOUND (needs to be created)', 'warn');
+        missing.push(t.name);
+      } else {
+        dbLog('  \u26a0  ' + t.name + ' \u2014 ' + result.error.message, 'warn');
+        missing.push(t.name);
+      }
+    } catch(e){
+      dbLog('  \u2717  ' + t.name + ' \u2014 ' + e.message, 'warn');
+      missing.push(t.name);
+    }
+  }
+
+  dbLog('', 'info');
+
+  if(missing.length === 0){
+    dbLog('\u2705  All 6 tables exist and are accessible!', 'ok');
+    dbLog('Your database is fully set up. Upload to Netlify and go! \ud83d\ude80', 'info');
+    btn.textContent = '\u2713 All Tables Ready';
+    btn.style.background = '#27ae60';
+    btn.classList.remove('btn-loading');
+    return;
+  }
+
+  dbLog(missing.length + ' table(s) missing. Copy the SQL below and run it in:', 'warn');
+  dbLog('Supabase \u2192 SQL Editor \u2192 New Query \u2192 paste \u2192 Run', 'info');
+  dbLog('', 'info');
+
+  var sqls = {
+    checklists:
+      "create table if not exists checklists (\n" +
+      "  id bigint generated always as identity primary key,\n" +
+      "  date date not null,\n" +
+      "  checklist_key text not null,\n" +
+      "  state jsonb default '{}',\n" +
+      "  waiter text, manager text,\n" +
+      "  updated_at timestamptz default now(),\n" +
+      "  unique(date, checklist_key)\n" +
+      ");\n" +
+      "alter table checklists enable row level security;\n" +
+      "create policy if not exists \"anon_all\" on checklists for all to anon using (true) with check (true);\n",
+
+    wastage_logs:
+      "create table if not exists wastage_logs (\n" +
+      "  id bigint generated always as identity primary key,\n" +
+      "  date date not null, dept text not null,\n" +
+      "  rows jsonb default '[]',\n" +
+      "  responsible_name text,\n" +
+      "  updated_at timestamptz default now(),\n" +
+      "  unique(date, dept)\n" +
+      ");\n" +
+      "alter table wastage_logs enable row level security;\n" +
+      "create policy if not exists \"anon_all\" on wastage_logs for all to anon using (true) with check (true);\n",
+
+    tips:
+      "create table if not exists tips (\n" +
+      "  id bigint generated always as identity primary key,\n" +
+      "  date date not null unique,\n" +
+      "  pool numeric, per_share numeric, total_shares numeric,\n" +
+      "  staff jsonb default '[]',\n" +
+      "  saved_at timestamptz\n" +
+      ");\n" +
+      "alter table tips enable row level security;\n" +
+      "create policy if not exists \"anon_all\" on tips for all to anon using (true) with check (true);\n",
+
+    supplier_settings:
+      "create table if not exists supplier_settings (\n" +
+      "  id bigint generated always as identity primary key,\n" +
+      "  cat text not null unique,\n" +
+      "  name text, phone text,\n" +
+      "  updated_at timestamptz default now()\n" +
+      ");\n" +
+      "alter table supplier_settings enable row level security;\n" +
+      "create policy if not exists \"anon_all\" on supplier_settings for all to anon using (true) with check (true);\n",
+
+    requisitions:
+      "create table if not exists requisitions (\n" +
+      "  id bigint generated always as identity primary key,\n" +
+      "  date date not null, supplier text not null,\n" +
+      "  requested_by text,\n" +
+      "  quantities jsonb default '{}',\n" +
+      "  units jsonb default '{}',\n" +
+      "  sent_at timestamptz default now(),\n" +
+      "  unique(date, supplier)\n" +
+      ");\n" +
+      "alter table requisitions enable row level security;\n" +
+      "create policy if not exists \"anon_all\" on requisitions for all to anon using (true) with check (true);\n",
+
+    daily_sales:
+      "create table if not exists daily_sales (\n" +
+      "  id bigint generated always as identity primary key,\n" +
+      "  date date not null unique,\n" +
+      "  total_sales numeric, ccm numeric, cash numeric,\n" +
+      "  customers integer, total_usd numeric,\n" +
+      "  updated_at timestamptz default now()\n" +
+      ");\n" +
+      "alter table daily_sales enable row level security;\n" +
+      "create policy if not exists \"anon_all\" on daily_sales for all to anon using (true) with check (true);\n"
+  };
+
+  var sqlToCopy = '';
+  for(var m=0; m<missing.length; m++) sqlToCopy += sqls[missing[m]] + '\n';
+
+  log.innerHTML +=
+    '<div style="margin-top:8px;">' +
+    '<textarea id="db-sql-copy" readonly style="width:100%;height:160px;font-family:monospace;font-size:0.68rem;padding:8px;border:1px solid var(--border);border-radius:var(--radius);background:#fff;color:var(--dark);resize:vertical;">' +
+    sqlToCopy.replace(/</g,'&lt;').replace(/>/g,'&gt;') +
+    '</textarea>' +
+    '<button class="btn btn-o btn-sm" onclick="var el=document.getElementById(\'db-sql-copy\');el.select();document.execCommand(\'copy\');toast(\'SQL copied!\');" style="margin-top:6px;">Copy SQL</button>' +
+    '</div>';
+
+  btn.textContent = '\u2699 Setup Database Tables';
+  btn.classList.remove('btn-loading');
+}
+
+
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2400); }
+
+/* ════════════════════════════════════════════════
+   SALES MODULE
+   Data key: 'gt_sales_data' in localStorage
+   Merged with embedded historical JSON on first load.
+   ════════════════════════════════════════════════ */
+const SALES_EMBEDDED = [{"date":"2024-09-19","total_sales":15435000,"ccm":null,"cash":null,"customers":6,"total_usd":null},{"date":"2024-09-20","total_sales":15052000,"ccm":null,"cash":null,"customers":20,"total_usd":null},{"date":"2024-09-21","total_sales":73179000,"ccm":341738400,"cash":null,"customers":21,"total_usd":null},{"date":"2024-09-22","total_sales":26865000,"ccm":null,"cash":null,"customers":22,"total_usd":null},{"date":"2024-09-24","total_sales":40365000,"ccm":null,"cash":null,"customers":8,"total_usd":null},{"date":"2024-09-25","total_sales":34838000,"ccm":null,"cash":null,"customers":25,"total_usd":null},{"date":"2024-09-26","total_sales":136004400,"ccm":null,"cash":null,"customers":37,"total_usd":null},{"date":"2024-11-21","total_sales":232486000,"ccm":432,"cash":2180,"customers":70,"total_usd":null},{"date":"2024-11-22","total_sales":232514997,"ccm":327,"cash":2250,"customers":129,"total_usd":null},{"date":"2024-11-23","total_sales":51615000,"ccm":48.41,"cash":535,"customers":20,"total_usd":null},{"date":"2024-11-27","total_sales":64755000,"ccm":180,"cash":540,"customers":24,"total_usd":null},{"date":"2024-11-28","total_sales":49500000,"ccm":null,"cash":550,"customers":null,"total_usd":null},{"date":"2024-11-29","total_sales":192915000,"ccm":443,"cash":1701,"customers":58,"total_usd":null},{"date":"2024-11-30","total_sales":82800000,"ccm":189,"cash":731,"customers":30,"total_usd":null},{"date":"2024-12-01","total_sales":65970000,"ccm":410,"cash":323,"customers":18,"total_usd":null},{"date":"2024-12-03","total_sales":73755000,"ccm":82,"cash":738,"customers":34,"total_usd":null},{"date":"2024-12-04","total_sales":30420000,"ccm":null,"cash":338,"customers":19,"total_usd":null},{"date":"2024-12-05","total_sales":143385300,"ccm":312.27,"cash":1280.9,"customers":33,"total_usd":null},{"date":"2024-12-06","total_sales":201479266,"ccm":926,"cash":1312.6,"customers":57,"total_usd":null},{"date":"2024-12-07","total_sales":111735000,"ccm":100,"cash":1141.5,"customers":45,"total_usd":null},{"date":"2024-12-08","total_sales":412951500,"ccm":null,"cash":4588.35,"customers":4,"total_usd":null},{"date":"2024-12-09","total_sales":26460000,"ccm":58,"cash":236,"customers":13,"total_usd":null},{"date":"2024-12-10","total_sales":17910000,"ccm":57,"cash":142,"customers":10,"total_usd":null},{"date":"2024-12-11","total_sales":69525000,"ccm":134,"cash":638.5,"customers":26,"total_usd":null},{"date":"2024-12-12","total_sales":176480522,"ccm":135,"cash":1826,"customers":24,"total_usd":null},{"date":"2024-12-13","total_sales":165868309,"ccm":251,"cash":1592,"customers":38,"total_usd":null},{"date":"2024-12-14","total_sales":139410000,"ccm":177,"cash":1372,"customers":60,"total_usd":null},{"date":"2024-12-15","total_sales":23849879,"ccm":null,"cash":265,"customers":12,"total_usd":null},{"date":"2024-12-16","total_sales":43289560,"ccm":186,"cash":295,"customers":18,"total_usd":null},{"date":"2024-12-17","total_sales":88244118,"ccm":86,"cash":895,"customers":56,"total_usd":null},{"date":"2024-12-18","total_sales":181168173,"ccm":1434,"cash":578.5,"customers":55,"total_usd":null},{"date":"2024-12-19","total_sales":138041082,"ccm":372,"cash":1162,"customers":53,"total_usd":null},{"date":"2024-12-20","total_sales":163950300,"ccm":119,"cash":1703,"customers":50,"total_usd":null},{"date":"2024-12-21","total_sales":207090000,"ccm":705,"cash":1596,"customers":74,"total_usd":null},{"date":"2024-12-22","total_sales":174285000,"ccm":858,"cash":1078.5,"customers":84,"total_usd":null},{"date":"2024-12-23","total_sales":246015000,"ccm":726,"cash":2007.5,"customers":64,"total_usd":null},{"date":"2024-12-24","total_sales":56115000,"ccm":40,"cash":583.5,"customers":30,"total_usd":null},{"date":"2024-12-25","total_sales":131445000,"ccm":61,"cash":1339.5,"customers":66,"total_usd":null},{"date":"2024-12-26","total_sales":198675984,"ccm":761.5,"cash":1446,"customers":72,"total_usd":null},{"date":"2024-12-27","total_sales":280982785,"ccm":1001,"cash":2121,"customers":109,"total_usd":null},{"date":"2024-12-28","total_sales":279902779,"ccm":null,"cash":3110,"customers":83,"total_usd":null},{"date":"2024-12-29","total_sales":172486703,"ccm":null,"cash":1916,"customers":53,"total_usd":null},{"date":"2024-12-30","total_sales":169822678,"ccm":233,"cash":1656,"customers":71,"total_usd":null},{"date":"2024-12-31","total_sales":406755591,"ccm":1215,"cash":3305,"customers":66,"total_usd":null},{"date":"2025-01-01","total_sales":152280000,"ccm":582,"cash":1110,"customers":77,"total_usd":1692},{"date":"2025-01-02","total_sales":169110000,"ccm":490,"cash":1389,"customers":69,"total_usd":1879},{"date":"2025-01-03","total_sales":212415300,"ccm":676,"cash":1684,"customers":83,"total_usd":2360},{"date":"2025-01-04","total_sales":247221000,"ccm":1075,"cash":1672,"customers":81,"total_usd":2747},{"date":"2025-01-05","total_sales":124965000,"ccm":406,"cash":982.5,"customers":33,"total_usd":1388.5},{"date":"2025-01-06","total_sales":79830000,"ccm":436,"cash":451,"customers":43,"total_usd":887},{"date":"2025-01-07","total_sales":160065000,"ccm":379,"cash":1399.5,"customers":65,"total_usd":1778.5},{"date":"2025-01-08","total_sales":90000000,"ccm":213,"cash":787,"customers":45,"total_usd":1000},{"date":"2025-01-09","total_sales":194117400,"ccm":1000,"cash":1157,"customers":69,"total_usd":2157},{"date":"2025-01-10","total_sales":260640000,"ccm":1197,"cash":1698.5,"customers":60,"total_usd":2895.5},{"date":"2025-01-11","total_sales":119520000,"ccm":50,"cash":1278,"customers":55,"total_usd":1328},{"date":"2025-01-12","total_sales":31815000,"ccm":48,"cash":305.5,"customers":21,"total_usd":353.5},{"date":"2025-01-13","total_sales":67815000,"ccm":151,"cash":602.5,"customers":36,"total_usd":753.5},{"date":"2025-01-14","total_sales":333180000,"ccm":75,"cash":3627,"customers":49,"total_usd":3702},{"date":"2025-01-15","total_sales":79065000,"ccm":420,"cash":458.5,"customers":40,"total_usd":878.5},{"date":"2025-01-16","total_sales":140580000,"ccm":269,"cash":1293,"customers":60,"total_usd":1562},{"date":"2025-01-17","total_sales":242415000,"ccm":507,"cash":2186.5,"customers":89,"total_usd":2693.5},{"date":"2025-01-18","total_sales":134955000,"ccm":405,"cash":1094.5,"customers":58,"total_usd":1499.5},{"date":"2025-01-19","total_sales":27495000,"ccm":165,"cash":140.5,"customers":13,"total_usd":305.5},{"date":"2025-01-20","total_sales":17955000,"ccm":39,"cash":160.5,"customers":15,"total_usd":199.5},{"date":"2025-01-21","total_sales":41535000,"ccm":183,"cash":278.5,"customers":31,"total_usd":461.5},{"date":"2025-01-22","total_sales":79470000,"ccm":319,"cash":564,"customers":46,"total_usd":883},{"date":"2025-01-23","total_sales":180540000,"ccm":242,"cash":1764,"customers":57,"total_usd":2006},{"date":"2025-01-24","total_sales":318915000,"ccm":1202,"cash":2341.5,"customers":88,"total_usd":3543.5},{"date":"2025-01-25","total_sales":259515000,"ccm":653,"cash":2230.5,"customers":74,"total_usd":2883.5},{"date":"2025-01-26","total_sales":51210000,"ccm":120,"cash":449,"customers":32,"total_usd":569},{"date":"2025-01-27","total_sales":20610000,"ccm":30,"cash":199,"customers":12,"total_usd":229},{"date":"2025-01-28","total_sales":74115000,"ccm":111,"cash":712.5,"customers":41,"total_usd":823.5},{"date":"2025-01-29","total_sales":55665000,"ccm":83,"cash":535.5,"customers":25,"total_usd":618.5},{"date":"2025-01-30","total_sales":145926000,"ccm":599.5,"cash":1021.9,"customers":59,"total_usd":1621.4},{"date":"2025-01-31","total_sales":189990900,"ccm":546,"cash":1565,"customers":90,"total_usd":2111},{"date":"2025-02-01","total_sales":402120000,"ccm":337,"cash":4131,"customers":127,"total_usd":4468},{"date":"2025-02-02","total_sales":null,"ccm":98,"cash":331,"customers":null,"total_usd":429},{"date":"2025-02-04","total_sales":null,"ccm":5,"cash":599,"customers":null,"total_usd":604},{"date":"2025-02-05","total_sales":92160000,"ccm":87,"cash":937,"customers":24,"total_usd":1024},{"date":"2025-02-06","total_sales":136035000,"ccm":546,"cash":965.5,"customers":43,"total_usd":1511.5},{"date":"2025-02-07","total_sales":203490000,"ccm":775,"cash":1486,"customers":67,"total_usd":2261},{"date":"2025-02-08","total_sales":260502500,"ccm":1603.5,"cash":1290.9,"customers":116,"total_usd":2894.4},{"date":"2025-02-09","total_sales":110833882,"ccm":60,"cash":1171,"customers":48,"total_usd":1231},{"date":"2025-02-10","total_sales":65534637,"ccm":92,"cash":636.16,"customers":38,"total_usd":728.16},{"date":"2025-02-11","total_sales":74744245,"ccm":169.99,"cash":660.5,"customers":27,"total_usd":830.49},{"date":"2025-02-12","total_sales":75194236,"ccm":100,"cash":735.49,"customers":26,"total_usd":835.49},{"date":"2025-02-13","total_sales":196332940,"ccm":1243,"cash":938.47,"customers":52,"total_usd":2181.4700000000003},{"date":"2025-02-14","total_sales":199755664,"ccm":512,"cash":1707.5,"customers":64,"total_usd":2219.5},{"date":"2025-02-15","total_sales":242417398,"ccm":577,"cash":2116.5,"customers":90,"total_usd":2693.5},{"date":"2025-02-16","total_sales":44685443,"ccm":212.8,"cash":283.7,"customers":18,"total_usd":496.5},{"date":"2025-02-17","total_sales":12015119,"ccm":null,"cash":133.5,"customers":8,"total_usd":133.5},{"date":"2025-02-18","total_sales":51930517,"ccm":28,"cash":549,"customers":null,"total_usd":577},{"date":"2025-02-19","total_sales":87300868,"ccm":459,"cash":511,"customers":20,"total_usd":970},{"date":"2025-02-20","total_sales":92619911,"ccm":421,"cash":608,"customers":42,"total_usd":1029},{"date":"2025-02-21","total_sales":172011496,"ccm":635,"cash":1276,"customers":76,"total_usd":1911},{"date":"2025-02-22","total_sales":187561852,"ccm":392,"cash":1692,"customers":77,"total_usd":2084},{"date":"2025-02-24","total_sales":76650793,"ccm":365,"cash":520,"customers":35,"total_usd":885},{"date":"2025-02-25","total_sales":41085402,"ccm":50,"cash":406.5,"customers":17,"total_usd":456.5},{"date":"2025-02-26","total_sales":113176114,"ccm":468,"cash":789.5,"customers":52,"total_usd":1257.5},{"date":"2025-02-27","total_sales":111241090,"ccm":685,"cash":551,"customers":44,"total_usd":1236},{"date":"2025-02-28","total_sales":203852012,"ccm":292.5,"cash":1972,"customers":77,"total_usd":2264.5},{"date":"2025-03-01","total_sales":164341627,"ccm":430,"cash":1396,"customers":56,"total_usd":1826},{"date":"2025-03-02","total_sales":65565652,"ccm":6,"cash":722.5,"customers":41,"total_usd":728.5},{"date":"2025-03-03","total_sales":27180267,"ccm":106,"cash":196,"customers":11,"total_usd":302},{"date":"2025-03-04","total_sales":79560789,"ccm":null,"cash":884,"customers":37,"total_usd":884},{"date":"2025-03-05","total_sales":42930421,"ccm":94,"cash":383,"customers":25,"total_usd":477},{"date":"2025-03-06","total_sales":72000717,"ccm":110,"cash":690,"customers":33,"total_usd":800},{"date":"2025-03-07","total_sales":173071702,"ccm":293,"cash":1630,"customers":75,"total_usd":1923},{"date":"2025-03-08","total_sales":150391488,"ccm":351,"cash":1320,"customers":78,"total_usd":1671},{"date":"2025-03-09","total_sales":63270628,"ccm":55,"cash":648,"customers":25,"total_usd":703},{"date":"2025-03-10","total_sales":39150387,"ccm":null,"cash":435,"customers":12,"total_usd":435},{"date":"2025-03-11","total_sales":46305450,"ccm":76,"cash":438.5,"customers":26,"total_usd":514.5},{"date":"2025-03-12","total_sales":129349096,"ccm":285,"cash":1152,"customers":51,"total_usd":1437},{"date":"2025-03-13","total_sales":151561498,"ccm":557,"cash":1127,"customers":55,"total_usd":1684},{"date":"2025-03-14","total_sales":117001148,"ccm":304,"cash":1005,"customers":50,"total_usd":1309},{"date":"2025-03-15","total_sales":166246346,"ccm":26,"cash":1821,"customers":82,"total_usd":1847},{"date":"2025-03-16","total_sales":64575636,"ccm":270,"cash":448,"customers":27,"total_usd":718},{"date":"2025-03-17","total_sales":33300333,"ccm":90,"cash":280,"customers":18,"total_usd":370},{"date":"2025-03-18","total_sales":63315632,"ccm":120,"cash":583.5,"customers":34,"total_usd":703.5},{"date":"2025-03-19","total_sales":11610112,"ccm":65,"cash":66,"customers":4,"total_usd":131},{"date":"2025-03-20","total_sales":58410579,"ccm":447,"cash":202,"customers":16,"total_usd":649},{"date":"2025-03-21","total_sales":370980000,"ccm":463,"cash":3659,"customers":100,"total_usd":4122},{"date":"2025-03-22","total_sales":172692000,"ccm":436,"cash":1482.8,"customers":64,"total_usd":1918.8},{"date":"2025-03-23","total_sales":54675000,"ccm":303,"cash":304.5,"customers":26,"total_usd":607.5},{"date":"2025-03-24","total_sales":118170000,"ccm":477,"cash":836,"customers":49,"total_usd":1313},{"date":"2025-03-25","total_sales":73665000,"ccm":322,"cash":496.5,"customers":27,"total_usd":818.5},{"date":"2025-03-26","total_sales":129510000,"ccm":411,"cash":1028,"customers":36,"total_usd":1439},{"date":"2025-03-27","total_sales":100215000,"ccm":443,"cash":670,"customers":52,"total_usd":1113},{"date":"2025-03-28","total_sales":220815000,"ccm":563,"cash":1890.5,"customers":93,"total_usd":2453.5},{"date":"2025-03-29","total_sales":245835000,"ccm":1111,"cash":1620.5,"customers":98,"total_usd":2731.5},{"date":"2025-03-30","total_sales":247402800,"ccm":904,"cash":1845,"customers":79,"total_usd":2749},{"date":"2025-03-31","total_sales":262939500,"ccm":1989,"cash":961.32,"customers":90,"total_usd":2950.32},{"date":"2025-04-01","total_sales":164610000,"ccm":1066,"cash":763,"customers":57,"total_usd":1829},{"date":"2025-04-02","total_sales":208185300,"ccm":1183,"cash":1130,"customers":123,"total_usd":2313},{"date":"2025-04-03","total_sales":220140000,"ccm":574,"cash":1872,"customers":64,"total_usd":2446},{"date":"2025-04-04","total_sales":214290000,"ccm":1071,"cash":1310,"customers":74,"total_usd":2381},{"date":"2025-04-05","total_sales":388800000,"ccm":2286,"cash":2034,"customers":92,"total_usd":4320},{"date":"2025-04-06","total_sales":80865000,"ccm":489,"cash":409.5,"customers":42,"total_usd":898.5},{"date":"2025-04-07","total_sales":35955000,"ccm":243,"cash":156.5,"customers":23,"total_usd":399.5},{"date":"2025-04-08","total_sales":34065000,"ccm":42,"cash":336,"customers":15,"total_usd":378},{"date":"2025-04-09","total_sales":99090000,"ccm":116,"cash":985,"customers":38,"total_usd":1101},{"date":"2025-04-10","total_sales":141525000,"ccm":1040,"cash":532.5,"customers":39,"total_usd":1572.5},{"date":"2025-04-11","total_sales":227430000,"ccm":767.5,"cash":1759.5,"customers":67,"total_usd":2527},{"date":"2025-04-12","total_sales":194175000,"ccm":556,"cash":1601,"customers":71,"total_usd":2157.5},{"date":"2025-04-13","total_sales":70560000,"ccm":166,"cash":618,"customers":29,"total_usd":784},{"date":"2025-04-14","total_sales":38160000,"ccm":21,"cash":400,"customers":22,"total_usd":421},{"date":"2025-04-15","total_sales":79605000,"ccm":209,"cash":675.5,"customers":27,"total_usd":884.5},{"date":"2025-04-16","total_sales":146340000,"ccm":723,"cash":903,"customers":74,"total_usd":1626},{"date":"2025-04-17","total_sales":191700000,"ccm":721,"cash":1409,"customers":57,"total_usd":2130},{"date":"2025-04-18","total_sales":204210000,"ccm":1191,"cash":1078,"customers":140,"total_usd":2269},{"date":"2025-04-19","total_sales":251343000,"ccm":646,"cash":2146,"customers":76,"total_usd":2792},{"date":"2025-04-20","total_sales":147195000,"ccm":845,"cash":790,"customers":51,"total_usd":1635},{"date":"2025-04-21","total_sales":69930000,"ccm":461,"cash":316,"customers":39,"total_usd":777},{"date":"2025-04-22","total_sales":176040000,"ccm":413,"cash":1543,"customers":77,"total_usd":1956},{"date":"2025-04-23","total_sales":98280000,"ccm":562,"cash":530,"customers":54,"total_usd":1092},{"date":"2025-04-24","total_sales":113013000,"ccm":245,"cash":1010,"customers":39,"total_usd":1255},{"date":"2025-04-25","total_sales":223506000,"ccm":1360,"cash":1123,"customers":82,"total_usd":2483},{"date":"2025-04-26","total_sales":157500000,"ccm":430,"cash":1320,"customers":67,"total_usd":1750},{"date":"2025-04-27","total_sales":7200000,"ccm":0,"cash":80,"customers":4,"total_usd":80},{"date":"2025-04-28","total_sales":54360000,"ccm":0,"cash":604,"customers":17,"total_usd":604},{"date":"2025-04-29","total_sales":120330000,"ccm":371,"cash":1121,"customers":36,"total_usd":1492},{"date":"2025-04-30","total_sales":134775000,"ccm":760,"cash":737.5,"customers":67,"total_usd":1497.5},{"date":"2025-05-01","total_sales":114660000,"ccm":235,"cash":1039,"customers":51,"total_usd":1274},{"date":"2025-05-02","total_sales":242676000,"ccm":990,"cash":1706,"customers":67,"total_usd":2696},{"date":"2025-05-03","total_sales":203702400,"ccm":1054,"cash":1209,"customers":59,"total_usd":2263},{"date":"2025-05-04","total_sales":65700000,"ccm":146,"cash":584,"customers":35,"total_usd":730},{"date":"2025-05-05","total_sales":22590000,"ccm":30,"cash":221,"customers":13,"total_usd":251},{"date":"2025-05-06","total_sales":57780000,"ccm":204,"cash":445,"customers":37,"total_usd":649},{"date":"2025-05-07","total_sales":87930000,"ccm":215,"cash":762,"customers":51,"total_usd":977},{"date":"2025-05-08","total_sales":154215000,"ccm":485.69,"cash":1227.81,"customers":53,"total_usd":1713.5},{"date":"2025-05-09","total_sales":315405000,"ccm":2244,"cash":1260.5,"customers":85,"total_usd":3504.5},{"date":"2025-05-10","total_sales":160920000,"ccm":415,"cash":1373,"customers":69,"total_usd":1788},{"date":"2025-05-11","total_sales":68085000,"ccm":419,"cash":337.5,"customers":31,"total_usd":756.5},{"date":"2025-05-12","total_sales":31500000,"ccm":311,"cash":39,"customers":11,"total_usd":350},{"date":"2025-05-13","total_sales":111375000,"ccm":570,"cash":667.5,"customers":46,"total_usd":1237.5},{"date":"2025-05-14","total_sales":77085000,"ccm":97.66,"cash":758.84,"customers":41,"total_usd":856.5},{"date":"2025-05-15","total_sales":334305000,"ccm":264,"cash":3450.5,"customers":81,"total_usd":3714.5},{"date":"2025-05-16","total_sales":226692000,"ccm":1041.5,"cash":1477.3,"customers":68,"total_usd":2518.8},{"date":"2025-05-17","total_sales":126135000,"ccm":103,"cash":1298.5,"customers":68,"total_usd":1401.5},{"date":"2025-05-18","total_sales":27990000,"ccm":130,"cash":181,"customers":12,"total_usd":311},{"date":"2025-05-19","total_sales":33300000,"ccm":16,"cash":354,"customers":25,"total_usd":370},{"date":"2025-05-20","total_sales":25470000,"ccm":100,"cash":183,"customers":11,"total_usd":283},{"date":"2025-05-21","total_sales":70290000,"ccm":70,"cash":711,"customers":36,"total_usd":781},{"date":"2025-05-22","total_sales":126450000,"ccm":487,"cash":918,"customers":65,"total_usd":1405},{"date":"2025-05-23","total_sales":238504500,"ccm":1430,"cash":1220,"customers":85,"total_usd":2650},{"date":"2025-05-24","total_sales":163050300,"ccm":801,"cash":1010,"customers":57,"total_usd":1811},{"date":"2025-05-25","total_sales":86220000,"ccm":205,"cash":753,"customers":35,"total_usd":958},{"date":"2025-05-26","total_sales":72720000,"ccm":189.81,"cash":618.19,"customers":34,"total_usd":808},{"date":"2025-05-27","total_sales":127794600,"ccm":679,"cash":740.94,"customers":55,"total_usd":1419.94},{"date":"2025-05-28","total_sales":209025000,"ccm":1093,"cash":1229.5,"customers":47,"total_usd":2322.5},{"date":"2025-05-29","total_sales":145575000,"ccm":929,"cash":688.5,"customers":59,"total_usd":1617.5},{"date":"2025-05-30","total_sales":243495000,"ccm":990,"cash":1715.5,"customers":77,"total_usd":2705.5},{"date":"2025-05-31","total_sales":215640000,"ccm":849.29,"cash":1546.71,"customers":81,"total_usd":2396},{"date":"2025-06-01","total_sales":72495000,"ccm":497,"cash":324,"customers":56,"total_usd":805.5},{"date":"2025-06-02","total_sales":111240000,"ccm":532,"cash":704,"customers":59,"total_usd":1236},{"date":"2025-06-03","total_sales":167985000,"ccm":807,"cash":1059.5,"customers":58,"total_usd":1866.5},{"date":"2025-06-04","total_sales":318960000,"ccm":17,"cash":3527,"customers":51,"total_usd":3544},{"date":"2025-06-05","total_sales":245880000,"ccm":863.53,"cash":1868.47,"customers":80,"total_usd":2732},{"date":"2025-06-06","total_sales":207900000,"ccm":708,"cash":1602,"customers":73,"total_usd":2310},{"date":"2025-06-07","total_sales":145530000,"ccm":439,"cash":1178,"customers":59,"total_usd":1617},{"date":"2025-06-08","total_sales":167940000,"ccm":904,"cash":962,"customers":58,"total_usd":1866},{"date":"2025-06-09","total_sales":139050000,"ccm":306,"cash":1239,"customers":59,"total_usd":1545},{"date":"2025-06-10","total_sales":59490000,"ccm":200,"cash":461,"customers":28,"total_usd":661},{"date":"2025-06-11","total_sales":130230000,"ccm":987.53,"cash":459.47,"customers":69,"total_usd":1447},{"date":"2025-06-12","total_sales":123570000,"ccm":1020,"cash":353,"customers":51,"total_usd":1373},{"date":"2025-06-13","total_sales":160155000,"ccm":637.6,"cash":1141.9,"customers":66,"total_usd":1779.5},{"date":"2025-06-14","total_sales":218484000,"ccm":1452,"cash":975.6,"customers":54,"total_usd":2427.6},{"date":"2025-06-15","total_sales":84195000,"ccm":0,"cash":935.5,"customers":35,"total_usd":935.5},{"date":"2025-06-16","total_sales":63090000,"ccm":60,"cash":641,"customers":30,"total_usd":701},{"date":"2025-06-17","total_sales":144405000,"ccm":50,"cash":1554.5,"customers":44,"total_usd":1604.5},{"date":"2025-06-18","total_sales":92520000,"ccm":518,"cash":510,"customers":45,"total_usd":1028},{"date":"2025-06-19","total_sales":180675000,"ccm":673,"cash":1334.5,"customers":76,"total_usd":2007.5},{"date":"2025-06-20","total_sales":149670000,"ccm":369,"cash":1294,"customers":61,"total_usd":1663},{"date":"2025-06-21","total_sales":88830000,"ccm":232,"cash":755,"customers":54,"total_usd":987},{"date":"2025-06-22","total_sales":84195000,"ccm":137.2,"cash":811,"customers":50,"total_usd":935.5},{"date":"2025-06-23","total_sales":59220000,"ccm":109,"cash":549,"customers":35,"total_usd":658},{"date":"2025-06-24","total_sales":85725000,"ccm":862.5,"cash":90,"customers":40,"total_usd":952.5},{"date":"2025-06-25","total_sales":114120000,"ccm":512,"cash":756,"customers":62,"total_usd":1268},{"date":"2025-06-26","total_sales":157680000,"ccm":558,"cash":1005.74,"customers":70,"total_usd":1752},{"date":"2025-06-27","total_sales":204750000,"ccm":1031,"cash":1244,"customers":93,"total_usd":2275},{"date":"2025-06-28","total_sales":151074000,"ccm":671,"cash":941.66,"customers":73,"total_usd":1678.6},{"date":"2025-06-29","total_sales":79020000,"ccm":42,"cash":836,"customers":42,"total_usd":878},{"date":"2025-06-30","total_sales":52065000,"ccm":291,"cash":287.5,"customers":34,"total_usd":578.5},{"date":"2025-07-01","total_sales":56385000,"ccm":279,"cash":278.87,"customers":34,"total_usd":626.5},{"date":"2025-07-02","total_sales":106839000,"ccm":483.26,"cash":559,"customers":47,"total_usd":1187.1},{"date":"2025-07-03","total_sales":113400000,"ccm":451,"cash":809,"customers":51,"total_usd":1260},{"date":"2025-07-04","total_sales":121914000,"ccm":425,"cash":929.6,"customers":60,"total_usd":1354.6},{"date":"2025-07-05","total_sales":108405000,"ccm":823,"cash":381.5,"customers":45,"total_usd":1204.5},{"date":"2025-07-06","total_sales":61110000,"ccm":355,"cash":320,"customers":43,"total_usd":679},{"date":"2025-07-07","total_sales":150705000,"ccm":785,"cash":889.5,"customers":44,"total_usd":1674.5},{"date":"2025-07-08","total_sales":124218000,"ccm":684,"cash":696,"customers":48,"total_usd":1380.2},{"date":"2025-07-09","total_sales":100890000,"ccm":878,"cash":243,"customers":38,"total_usd":1121},{"date":"2025-07-10","total_sales":177255000,"ccm":1242,"cash":727.5,"customers":72,"total_usd":1969.5},{"date":"2025-07-11","total_sales":172935000,"ccm":854,"cash":1067.5,"customers":61,"total_usd":1921.5},{"date":"2025-07-12","total_sales":147474000,"ccm":643,"cash":995.6,"customers":51,"total_usd":1638.6},{"date":"2025-07-13","total_sales":93294000,"ccm":177,"cash":859.6,"customers":47,"total_usd":1036.6},{"date":"2025-07-14","total_sales":101160000,"ccm":281,"cash":843,"customers":42,"total_usd":1124},{"date":"2025-07-15","total_sales":175095000,"ccm":708,"cash":1237.5,"customers":77,"total_usd":1945.5},{"date":"2025-07-16","total_sales":116910000,"ccm":1034,"cash":265,"customers":54,"total_usd":1299},{"date":"2025-07-17","total_sales":167175000,"ccm":380,"cash":1477.5,"customers":59,"total_usd":1857.5},{"date":"2025-07-18","total_sales":193275000,"ccm":1916,"cash":231.5,"customers":79,"total_usd":2147.5},{"date":"2025-07-19","total_sales":116545000,"ccm":542,"cash":753,"customers":62,"total_usd":1294.9444444444443},{"date":"2025-07-20","total_sales":72360000,"ccm":461,"cash":343,"customers":50,"total_usd":804},{"date":"2025-07-21","total_sales":117810000,"ccm":991,"cash":318,"customers":58,"total_usd":1309},{"date":"2025-07-22","total_sales":194805000,"ccm":628,"cash":1536.5,"customers":55,"total_usd":2164.5},{"date":"2025-07-23","total_sales":128790000,"ccm":1057,"cash":374,"customers":54,"total_usd":1431},{"date":"2025-07-24","total_sales":177480000,"ccm":999,"cash":973,"customers":71,"total_usd":1972},{"date":"2025-07-25","total_sales":218611800,"ccm":1666,"cash":763,"customers":66,"total_usd":2429.02},{"date":"2025-07-26","total_sales":152685000,"ccm":726,"cash":970,"customers":72,"total_usd":1696.5},{"date":"2025-07-27","total_sales":150691500,"ccm":622,"cash":1052,"customers":78,"total_usd":1674.35},{"date":"2025-07-28","total_sales":109620000,"ccm":305,"cash":913,"customers":59,"total_usd":1218},{"date":"2025-07-29","total_sales":202680000,"ccm":828,"cash":1424,"customers":80,"total_usd":2252},{"date":"2025-07-30","total_sales":187920000,"ccm":1224,"cash":864,"customers":77,"total_usd":2088},{"date":"2025-07-31","total_sales":160785000,"ccm":1457,"cash":329.5,"customers":82,"total_usd":1786.5},{"date":"2025-08-01","total_sales":184585000,"ccm":1379,"cash":672,"customers":82,"total_usd":2050.9444444444443},{"date":"2025-08-02","total_sales":144360000,"ccm":802,"cash":802,"customers":76,"total_usd":1604},{"date":"2025-08-03","total_sales":107370000,"ccm":590,"cash":603,"customers":54,"total_usd":1193},{"date":"2025-08-04","total_sales":163080000,"ccm":1406,"cash":406,"customers":68,"total_usd":1812},{"date":"2025-08-05","total_sales":240300000,"ccm":1670,"cash":1000,"customers":47,"total_usd":2670},{"date":"2025-08-06","total_sales":208845000,"ccm":1574,"cash":746,"customers":56,"total_usd":2320.5},{"date":"2025-08-07","total_sales":197820000,"ccm":1113,"cash":1085,"customers":80,"total_usd":2198},{"date":"2025-08-08","total_sales":206356500,"ccm":1295,"cash":998,"customers":81,"total_usd":2292.85},{"date":"2025-08-09","total_sales":258030000,"ccm":826,"cash":2041,"customers":75,"total_usd":2867},{"date":"2025-08-10","total_sales":151605000,"ccm":757,"cash":928,"customers":70,"total_usd":1684.5},{"date":"2025-08-11","total_sales":188520300,"ccm":897,"cash":1198,"customers":98,"total_usd":2094.67},{"date":"2025-08-12","total_sales":191925000,"ccm":982,"cash":1150.5,"customers":74,"total_usd":2132.5},{"date":"2025-08-13","total_sales":186300000,"ccm":1329,"cash":741,"customers":78,"total_usd":2070},{"date":"2025-08-14","total_sales":193230000,"ccm":1133,"cash":1014,"customers":89,"total_usd":2147},{"date":"2025-08-15","total_sales":184680000,"ccm":634,"cash":1418,"customers":67,"total_usd":2052},{"date":"2025-08-16","total_sales":158805000,"ccm":729,"cash":1035,"customers":75,"total_usd":1764.5},{"date":"2025-08-17","total_sales":139365000,"ccm":461,"cash":1087,"customers":60,"total_usd":1548.5},{"date":"2025-08-18","total_sales":192465000,"ccm":613,"cash":1525,"customers":89,"total_usd":2138.5},{"date":"2025-08-19","total_sales":148230000,"ccm":863,"cash":784,"customers":64,"total_usd":1647},{"date":"2025-08-20","total_sales":153315000,"ccm":952,"cash":751,"customers":82,"total_usd":1703.5},{"date":"2025-08-21","total_sales":180319975,"ccm":905,"cash":1098,"customers":72,"total_usd":2003.5552777777777},{"date":"2025-08-22","total_sales":201915000,"ccm":956,"cash":1287,"customers":71,"total_usd":2243.5},{"date":"2025-08-23","total_sales":112374000,"ccm":517,"cash":731.5999999999999,"customers":52,"total_usd":1248.6},{"date":"2025-08-24","total_sales":120960000,"ccm":284,"cash":1060,"customers":57,"total_usd":1344},{"date":"2025-08-25","total_sales":200880000,"ccm":897,"cash":1335,"customers":86,"total_usd":2232},{"date":"2025-08-26","total_sales":125523000,"ccm":313,"cash":1081.7,"customers":65,"total_usd":1394.7},{"date":"2025-08-27","total_sales":196200000,"ccm":1238.5,"cash":941.5,"customers":66,"total_usd":2180},{"date":"2025-08-28","total_sales":216801000,"ccm":974,"cash":1434.9,"customers":77,"total_usd":2408.9},{"date":"2025-08-29","total_sales":203805000,"ccm":1000,"cash":1264.5,"customers":83,"total_usd":2264.5},{"date":"2025-08-30","total_sales":193365000,"ccm":849,"cash":1299.5,"customers":65,"total_usd":2148.5},{"date":"2025-08-31","total_sales":81513900,"ccm":530,"cash":375,"customers":42,"total_usd":905.71},{"date":"2025-09-01","total_sales":39015000,"ccm":125,"cash":308.5,"customers":24,"total_usd":433.5},{"date":"2025-09-02","total_sales":88470000,"ccm":113,"cash":870,"customers":36,"total_usd":983},{"date":"2025-09-03","total_sales":132075000,"ccm":668.55,"cash":798.95,"customers":54,"total_usd":1467.5},{"date":"2025-09-04","total_sales":147105000,"ccm":518,"cash":1116.5,"customers":58,"total_usd":1634.5},{"date":"2025-09-05","total_sales":157455000,"ccm":838,"cash":911.5,"customers":59,"total_usd":1749.5},{"date":"2025-09-06","total_sales":231408900,"ccm":1192,"cash":1379.21,"customers":97,"total_usd":2571.21},{"date":"2025-09-07","total_sales":3420000,"ccm":42,"cash":0,"customers":4,"total_usd":38},{"date":"2025-09-08","total_sales":70965000,"ccm":100,"cash":688.5,"customers":26,"total_usd":788.5},{"date":"2025-09-09","total_sales":76095000,"ccm":170,"cash":675.5,"customers":30,"total_usd":845.5},{"date":"2025-09-10","total_sales":394110000,"ccm":1828,"cash":2551,"customers":60,"total_usd":4379},{"date":"2025-09-11","total_sales":533745000,"ccm":3497,"cash":2433.5,"customers":55,"total_usd":5930.5},{"date":"2025-09-12","total_sales":478575000,"ccm":1867,"cash":3450.5,"customers":82,"total_usd":5317.5},{"date":"2025-09-13","total_sales":263583900,"ccm":1085,"cash":1843.71,"customers":64,"total_usd":2928.71},{"date":"2025-09-14","total_sales":39870000,"ccm":64,"cash":443,"customers":15,"total_usd":443},{"date":"2025-09-15","total_sales":37620000,"ccm":125,"cash":293,"customers":17,"total_usd":418},{"date":"2025-09-16","total_sales":47745000,"ccm":47,"cash":484,"customers":21,"total_usd":530.5},{"date":"2025-09-17","total_sales":179190000,"ccm":526,"cash":1465,"customers":99,"total_usd":1991},{"date":"2025-09-18","total_sales":123390000,"ccm":177.5,"cash":1193.5,"customers":67,"total_usd":1371},{"date":"2025-09-19","total_sales":230967000,"ccm":851.25,"cash":1715.05,"customers":79,"total_usd":2566.3},{"date":"2025-09-20","total_sales":141885000,"ccm":840,"cash":736.5,"customers":57,"total_usd":1576.5},{"date":"2025-09-21","total_sales":11880000,"ccm":103,"cash":29,"customers":9,"total_usd":132},{"date":"2025-09-22","total_sales":78840000,"ccm":294,"cash":582,"customers":32,"total_usd":876},{"date":"2025-09-23","total_sales":69435000,"ccm":241.35,"cash":530.15,"customers":24,"total_usd":771.5},{"date":"2025-09-24","total_sales":35595000,"ccm":395.5,"cash":318.4,"customers":11,"total_usd":395.5},{"date":"2025-09-25","total_sales":149886000,"ccm":561,"cash":1104.4,"customers":44,"total_usd":1665.4},{"date":"2025-09-26","total_sales":261765000,"ccm":1177.5,"cash":1731,"customers":97,"total_usd":2908.5},{"date":"2025-09-27","total_sales":236325000,"ccm":1231,"cash":1394.83,"customers":83,"total_usd":2625.8333333333335},{"date":"2025-09-28","total_sales":10350000,"ccm":0,"cash":115,"customers":5,"total_usd":115},{"date":"2025-09-29","total_sales":25830000,"ccm":84,"cash":203,"customers":11,"total_usd":287},{"date":"2025-09-30","total_sales":32445000,"ccm":198,"cash":162.5,"customers":13,"total_usd":360.5},{"date":"2025-10-01","total_sales":120047400,"ccm":396,"cash":937.86,"customers":44,"total_usd":1333.86},{"date":"2025-10-02","total_sales":146670000,"ccm":573,"cash":1056.6666666666667,"customers":46,"total_usd":1629.6666666666667},{"date":"2025-10-03","total_sales":170145000,"ccm":787.05,"cash":1103.45,"customers":48,"total_usd":1890.5},{"date":"2025-10-04","total_sales":157545000,"ccm":764,"cash":986.5,"customers":67,"total_usd":1750.5},{"date":"2025-10-05","total_sales":11070000,"ccm":62,"cash":61,"customers":9,"total_usd":123},{"date":"2025-10-06","total_sales":1800000,"ccm":null,"cash":20,"customers":2,"total_usd":20},{"date":"2025-10-07","total_sales":44405000,"ccm":0,"cash":493.39,"customers":9,"total_usd":493.3888888888889},{"date":"2025-10-08","total_sales":133857000,"ccm":748,"cash":739.3,"customers":41,"total_usd":1487.3},{"date":"2025-10-09","total_sales":100935000,"ccm":398,"cash":723.5,"customers":65,"total_usd":1121.5},{"date":"2025-10-10","total_sales":176130000,"ccm":792,"cash":1165,"customers":64,"total_usd":1957},{"date":"2025-10-11","total_sales":195345000,"ccm":1264.5,"cash":906,"customers":81,"total_usd":2170.5},{"date":"2025-10-12","total_sales":51570000,"ccm":195,"cash":378,"customers":29,"total_usd":573},{"date":"2025-10-13","total_sales":25920000,"ccm":190,"cash":98,"customers":5,"total_usd":288},{"date":"2025-10-14","total_sales":6390000,"ccm":0,"cash":71,"customers":5,"total_usd":71},{"date":"2025-10-15","total_sales":105367500,"ccm":671,"cash":499.75,"customers":32,"total_usd":1170.75},{"date":"2025-10-16","total_sales":144360000,"ccm":330,"cash":1274,"customers":55,"total_usd":1604},{"date":"2025-10-17","total_sales":205326010,"ccm":1211,"cash":1070.4,"customers":93,"total_usd":2281.400111111111},{"date":"2025-10-18","total_sales":175078000,"ccm":367.5,"cash":1577.81,"customers":80,"total_usd":1945.3111111111111},{"date":"2025-10-19","total_sales":62640000,"ccm":480,"cash":216,"customers":31,"total_usd":696},{"date":"2025-10-20","total_sales":23310001,"ccm":55.5,"cash":203.5,"customers":18,"total_usd":259.0000111111111},{"date":"2025-10-21","total_sales":68490000,"ccm":122,"cash":639,"customers":27,"total_usd":761},{"date":"2025-10-22","total_sales":85149100,"ccm":170,"cash":776.1,"customers":41,"total_usd":946.1011111111111},{"date":"2025-10-23","total_sales":167653800,"ccm":628,"cash":1234.82,"customers":61,"total_usd":1862.82},{"date":"2025-10-24","total_sales":264195000,"ccm":1732,"cash":1203.5,"customers":82,"total_usd":2935.5},{"date":"2025-10-25","total_sales":204300000,"ccm":1098,"cash":1172,"customers":72,"total_usd":2270},{"date":"2025-10-26","total_sales":60030000,"ccm":89,"cash":578,"customers":32,"total_usd":667},{"date":"2025-10-27","total_sales":55440000,"ccm":335,"cash":281,"customers":24,"total_usd":616},{"date":"2025-10-28","total_sales":37620000,"ccm":92,"cash":326,"customers":10,"total_usd":418},{"date":"2025-10-29","total_sales":26190000,"ccm":205,"cash":86,"customers":12,"total_usd":291},{"date":"2025-10-30","total_sales":138060000,"ccm":590,"cash":944,"customers":37,"total_usd":1534},{"date":"2025-10-31","total_sales":229923000,"ccm":1194,"cash":1360.7,"customers":79,"total_usd":2554.7},{"date":"2025-11-01","total_sales":176580000,"ccm":526,"cash":1436,"customers":68,"total_usd":1962},{"date":"2025-11-02","total_sales":43965000,"ccm":113,"cash":375.5,"customers":22,"total_usd":488.5},{"date":"2025-11-03","total_sales":76680000,"ccm":209,"cash":643,"customers":40,"total_usd":852},{"date":"2025-11-04","total_sales":89505000,"ccm":355,"cash":639.5,"customers":23,"total_usd":994.5},{"date":"2025-11-05","total_sales":66690000,"ccm":376,"cash":365,"customers":23,"total_usd":741},{"date":"2025-11-06","total_sales":141839999,"ccm":535,"cash":1041,"customers":44,"total_usd":1575.999988888889},{"date":"2025-11-07","total_sales":307179000,"ccm":1309,"cash":2104.1,"customers":65,"total_usd":3413.1},{"date":"2025-11-08","total_sales":200250000,"ccm":938,"cash":1287,"customers":84,"total_usd":2225},{"date":"2025-11-09","total_sales":74835000,"ccm":121,"cash":710,"customers":36,"total_usd":831.5},{"date":"2025-11-10","total_sales":4500000,"ccm":50,"cash":null,"customers":1,"total_usd":50},{"date":"2025-11-11","total_sales":59094000,"ccm":104,"cash":552.5,"customers":34,"total_usd":656.6},{"date":"2025-11-12","total_sales":329850000,"ccm":1842.5,"cash":1822.5,"customers":42,"total_usd":3665},{"date":"2025-11-13","total_sales":448155000,"ccm":3100,"cash":1879.5,"customers":53,"total_usd":4979.5},{"date":"2025-11-14","total_sales":563882400,"ccm":2584,"cash":3681.3900000000003,"customers":49,"total_usd":6265.36},{"date":"2025-11-15","total_sales":277470000,"ccm":1248,"cash":1835,"customers":70,"total_usd":3083},{"date":"2025-11-16","total_sales":43245000,"ccm":150,"cash":330.5,"customers":25,"total_usd":480.5},{"date":"2025-11-17","total_sales":15570000,"ccm":45,"cash":128,"customers":9,"total_usd":173},{"date":"2025-11-18","total_sales":12330000,"ccm":null,"cash":137,"customers":5,"total_usd":137},{"date":"2025-11-19","total_sales":75465000,"ccm":422,"cash":416.5,"customers":37,"total_usd":838.5},{"date":"2025-11-20","total_sales":103140000,"ccm":191,"cash":955,"customers":40,"total_usd":1146},{"date":"2025-11-21","total_sales":208542600,"ccm":524.5,"cash":1792.6399999999999,"customers":78,"total_usd":2317.14},{"date":"2025-11-22","total_sales":232065000,"ccm":563,"cash":2015.5,"customers":92,"total_usd":2578.5},{"date":"2025-11-23","total_sales":12780000,"ccm":0,"cash":142,"customers":5,"total_usd":142},{"date":"2025-11-24","total_sales":14040000,"ccm":null,"cash":156,"customers":12,"total_usd":156},{"date":"2025-11-25","total_sales":21780000,"ccm":186.5,"cash":55.5,"customers":11,"total_usd":242},{"date":"2025-11-26","total_sales":17190000,"ccm":140,"cash":51,"customers":9,"total_usd":191},{"date":"2025-11-27","total_sales":133695000,"ccm":595,"cash":890.5,"customers":95,"total_usd":1485.5},{"date":"2025-11-28","total_sales":224667000,"ccm":343,"cash":2153.3,"customers":62,"total_usd":2496.3},{"date":"2025-11-29","total_sales":148500000,"ccm":318,"cash":1332,"customers":63,"total_usd":1650},{"date":"2025-11-30","total_sales":29835000,"ccm":114,"cash":217.5,"customers":18,"total_usd":331.5},{"date":"2025-12-01","total_sales":50607000,"ccm":264,"cash":298.29999999999995,"customers":29,"total_usd":562.3},{"date":"2025-12-02","total_sales":22725000,"ccm":25,"cash":227.5,"customers":16,"total_usd":252.5},{"date":"2025-12-03","total_sales":50220000,"ccm":248.5,"cash":309.5,"customers":33,"total_usd":558},{"date":"2025-12-04","total_sales":43605000,"ccm":207,"cash":277.5,"customers":20,"total_usd":484.5},{"date":"2025-12-05","total_sales":216630000,"ccm":1195.5,"cash":1211.5,"customers":61,"total_usd":2407},{"date":"2025-12-06","total_sales":204705000,"ccm":1370.5,"cash":904,"customers":65,"total_usd":2274.5},{"date":"2025-12-07","total_sales":13815000,"ccm":120,"cash":33.5,"customers":7,"total_usd":153.5},{"date":"2025-12-08","total_sales":7065000,"ccm":0,"cash":78.5,"customers":3,"total_usd":78.5},{"date":"2025-12-09","total_sales":35730000,"ccm":125,"cash":272,"customers":22,"total_usd":397},{"date":"2025-12-10","total_sales":84555000,"ccm":347,"cash":592.5,"customers":33,"total_usd":939.5},{"date":"2025-12-11","total_sales":126855000,"ccm":519.61,"cash":889.89,"customers":54,"total_usd":1409.5},{"date":"2025-12-12","total_sales":244125000,"ccm":1390,"cash":1322.5,"customers":71,"total_usd":2712.5},{"date":"2025-12-13","total_sales":248490000,"ccm":1017,"cash":1744,"customers":86,"total_usd":2761},{"date":"2025-12-14","total_sales":71955000,"ccm":228,"cash":571.5,"customers":42,"total_usd":799.5},{"date":"2025-12-15","total_sales":75150000,"ccm":263,"cash":572,"customers":50,"total_usd":835},{"date":"2025-12-16","total_sales":108765000,"ccm":709,"cash":499.5,"customers":46,"total_usd":1208.5},{"date":"2025-12-17","total_sales":108765000,"ccm":517,"cash":691.5,"customers":44,"total_usd":1208.5},{"date":"2025-12-18","total_sales":246582000,"ccm":1565.37,"cash":1174.4300000000003,"customers":79,"total_usd":2739.8},{"date":"2025-12-19","total_sales":376200000,"ccm":2599.5,"cash":1580.5,"customers":96,"total_usd":4180},{"date":"2025-12-20","total_sales":358758000,"ccm":1058.72,"cash":2927.4799999999996,"customers":117,"total_usd":3986.2},{"date":"2025-12-21","total_sales":191205000,"ccm":595,"cash":1529.5,"customers":83,"total_usd":2124.5},{"date":"2025-12-22","total_sales":241650000,"ccm":1179,"cash":1506,"customers":91,"total_usd":2685},{"date":"2025-12-23","total_sales":303660000,"ccm":1717,"cash":1657,"customers":75,"total_usd":3374},{"date":"2025-12-24","total_sales":152820000,"ccm":1075,"cash":623,"customers":59,"total_usd":1698},{"date":"2025-12-25","total_sales":348615000,"ccm":1225,"cash":2648.5,"customers":140,"total_usd":3873.5},{"date":"2025-12-26","total_sales":270558000,"ccm":980,"cash":2026.1999999999998,"customers":110,"total_usd":3006.2},{"date":"2025-12-27","total_sales":303409799,"ccm":1655.3,"cash":1715.919988888889,"customers":96,"total_usd":3371.219988888889},{"date":"2025-12-28","total_sales":186460560,"ccm":390,"cash":1681.784,"customers":85,"total_usd":2071.784},{"date":"2025-12-29","total_sales":248238000,"ccm":1809,"cash":949.1999999999998,"customers":78,"total_usd":2758.2},{"date":"2025-12-30","total_sales":293625000,"ccm":2818.17,"cash":444.3299999999999,"customers":72,"total_usd":3262.5},{"date":"2025-12-31","total_sales":400302000,"ccm":764,"cash":3683.8,"customers":131,"total_usd":4447.8},{"date":"2026-01-01","total_sales":159390000,"ccm":1184.7,"cash":586.3,"customers":70,"total_usd":1771},{"date":"2026-01-02","total_sales":258660000,"ccm":1440.5,"cash":1433.5,"customers":95,"total_usd":2874},{"date":"2026-01-03","total_sales":249120000,"ccm":1359,"cash":1409,"customers":75,"total_usd":2768},{"date":"2026-01-04","total_sales":92655000,"ccm":0,"cash":1029.5,"customers":40,"total_usd":1029.5},{"date":"2026-01-05","total_sales":110385000,"ccm":190,"cash":1036.5,"customers":53,"total_usd":1226.5},{"date":"2026-01-06","total_sales":79380000,"ccm":480,"cash":402,"customers":39,"total_usd":882},{"date":"2026-01-07","total_sales":123043500,"ccm":741,"cash":626.1500000000001,"customers":46,"total_usd":1367.15},{"date":"2026-01-08","total_sales":138330000,"ccm":null,"cash":1537,"customers":null,"total_usd":1537},{"date":"2026-01-09","total_sales":174433200,"ccm":711,"cash":1227.1466666666668,"customers":58,"total_usd":1938.1466666666668},{"date":"2026-01-10","total_sales":172170000,"ccm":484,"cash":1429,"customers":47,"total_usd":1913},{"date":"2026-01-11","total_sales":13716000,"ccm":73,"cash":79.4,"customers":10,"total_usd":152.4},{"date":"2026-01-12","total_sales":3960000,"ccm":44,"cash":0,"customers":3,"total_usd":44},{"date":"2026-01-13","total_sales":44505000,"ccm":202,"cash":292.5,"customers":21,"total_usd":494.5},{"date":"2026-01-14","total_sales":57825000,"ccm":281.5,"cash":361,"customers":26,"total_usd":642.5},{"date":"2026-01-15","total_sales":50265000,"ccm":190,"cash":368.5,"customers":23,"total_usd":558.5},{"date":"2026-01-16","total_sales":183598000,"ccm":1093,"cash":946.9777777777779,"customers":70,"total_usd":2039.9777777777779},{"date":"2026-01-17","total_sales":161568749,"ccm":796,"cash":999.2083222222223,"customers":53,"total_usd":1795.2083222222223},{"date":"2026-01-18","total_sales":58905000,"ccm":299,"cash":355.5,"customers":29,"total_usd":654.5},{"date":"2026-01-19","total_sales":39555000,"ccm":60,"cash":379.5,"customers":556,"total_usd":439.5},{"date":"2026-01-20","total_sales":15246000,"ccm":0,"cash":169.4,"customers":11,"total_usd":169.4},{"date":"2026-01-21","total_sales":318906000,"ccm":1218.18,"cash":2325.2200000000003,"customers":51,"total_usd":3543.4},{"date":"2026-01-22","total_sales":524214000,"ccm":1789,"cash":4035.6000000000004,"customers":65,"total_usd":5824.6},{"date":"2026-01-23","total_sales":556470000,"ccm":2633.11,"cash":3549.89,"customers":70,"total_usd":6183},{"date":"2026-01-24","total_sales":535635000,"ccm":2222,"cash":3729.5,"customers":59,"total_usd":5951.5},{"date":"2026-01-25","total_sales":40275000,"ccm":255,"cash":192.5,"customers":23,"total_usd":447.5},{"date":"2026-01-26","total_sales":17280000,"ccm":0,"cash":192,"customers":6,"total_usd":192},{"date":"2026-01-27","total_sales":40725000,"ccm":378.5,"cash":74,"customers":20,"total_usd":452.5},{"date":"2026-01-28","total_sales":33435000,"ccm":60,"cash":311.5,"customers":20,"total_usd":371.5},{"date":"2026-01-29","total_sales":117045000,"ccm":400,"cash":900.5,"customers":39,"total_usd":1300.5},{"date":"2026-01-30","total_sales":332370000,"ccm":971,"cash":2722,"customers":43,"total_usd":3693},{"date":"2026-01-31","total_sales":195540300,"ccm":1083,"cash":1089.67,"customers":81,"total_usd":2172.67},{"date":"2026-02-01","total_sales":13725000,"ccm":0,"cash":152.5,"customers":10,"total_usd":152.5},{"date":"2026-02-02","total_sales":21960000,"ccm":95,"cash":149,"customers":17,"total_usd":244},{"date":"2026-02-03","total_sales":4365000,"ccm":21,"cash":27.5,"customers":4,"total_usd":48.5},{"date":"2026-02-04","total_sales":94590000,"ccm":517,"cash":534,"customers":35,"total_usd":1051},{"date":"2026-02-05","total_sales":125325000,"ccm":522,"cash":870.5,"customers":49,"total_usd":1392.5},{"date":"2026-02-06","total_sales":183285000,"ccm":941.85,"cash":1094.65,"customers":57,"total_usd":2036.5},{"date":"2026-02-07","total_sales":246240000,"ccm":997,"cash":1739,"customers":69,"total_usd":2736},{"date":"2026-02-08","total_sales":30510000,"ccm":102,"cash":237,"customers":10,"total_usd":339},{"date":"2026-02-09","total_sales":78336000,"ccm":250,"cash":620.4,"customers":34,"total_usd":870.4},{"date":"2026-02-10","total_sales":40185000,"ccm":0,"cash":446.5,"customers":16,"total_usd":446.5},{"date":"2026-02-11","total_sales":36720000,"ccm":221,"cash":187,"customers":13,"total_usd":408},{"date":"2026-02-12","total_sales":87030000,"ccm":410,"cash":557,"customers":23,"total_usd":967},{"date":"2026-02-13","total_sales":225180000,"ccm":826,"cash":1676,"customers":63,"total_usd":2502},{"date":"2026-02-14","total_sales":198150300,"ccm":1054.55,"cash":1147.1200000000001,"customers":61,"total_usd":2201.67},{"date":"2026-02-15","total_sales":9630000,"ccm":0,"cash":107,"customers":7,"total_usd":107},{"date":"2026-02-16","total_sales":45540000,"ccm":173,"cash":333,"customers":12,"total_usd":506},{"date":"2026-02-17","total_sales":52650000,"ccm":245,"cash":340,"customers":17,"total_usd":585},{"date":"2026-02-18","total_sales":13950000,"ccm":20,"cash":135,"customers":6,"total_usd":155},{"date":"2026-02-19","total_sales":100890000,"ccm":237,"cash":884,"customers":40,"total_usd":1121},{"date":"2026-02-20","total_sales":122175000,"ccm":239,"cash":1118.5,"customers":53,"total_usd":1357.5},{"date":"2026-02-21","total_sales":186525000,"ccm":674,"cash":1398.5,"customers":60,"total_usd":2072.5},{"date":"2026-02-22","total_sales":75105000,"ccm":295,"cash":539.5,"customers":30,"total_usd":834.5},{"date":"2026-02-23","total_sales":5040000,"ccm":0,"cash":56,"customers":3,"total_usd":56},{"date":"2026-02-24","total_sales":31005000,"ccm":130,"cash":214.5,"customers":18,"total_usd":344.5},{"date":"2026-02-25","total_sales":22770000,"ccm":164,"cash":89,"customers":13,"total_usd":253},{"date":"2026-02-26","total_sales":87300000,"ccm":623,"cash":347,"customers":29,"total_usd":970},{"date":"2026-02-27","total_sales":151650000,"ccm":753,"cash":932,"customers":59,"total_usd":1685},{"date":"2026-02-28","total_sales":91620000,"ccm":590,"cash":428,"customers":28,"total_usd":1018},{"date":"2026-03-01","total_sales":17640000,"ccm":141,"cash":55,"customers":8,"total_usd":196},{"date":"2026-03-02","total_sales":3510000,"ccm":6,"cash":33,"customers":3,"total_usd":39},{"date":"2026-03-04","total_sales":2385000,"ccm":null,"cash":26.5,"customers":3,"total_usd":26.5},{"date":"2026-03-06","total_sales":270000000,"ccm":null,"cash":3000,"customers":60,"total_usd":3000},{"date":"2026-03-08","total_sales":10125000,"ccm":0,"cash":112.5,"customers":3,"total_usd":112.5},{"date":"2026-03-13","total_sales":9090000,"ccm":0,"cash":101,"customers":3,"total_usd":101},{"date":"2026-03-19","total_sales":32670000,"ccm":312,"cash":51,"customers":14,"total_usd":363},{"date":"2026-03-20","total_sales":147600000,"ccm":978,"cash":662,"customers":82,"total_usd":1640},{"date":"2026-03-21","total_sales":114525000,"ccm":985,"cash":287.5,"customers":44,"total_usd":1272.5},{"date":"2026-03-22","total_sales":12780000,"ccm":87,"cash":55,"customers":7,"total_usd":142},{"date":"2026-03-26","total_sales":34920000,"ccm":192,"cash":196,"customers":12,"total_usd":388},{"date":"2026-03-27","total_sales":316485000,"ccm":1540,"cash":1976.5,"customers":91,"total_usd":3516.5},{"date":"2026-03-28","total_sales":71100000,"ccm":456,"cash":334,"customers":32,"total_usd":790}];
+
+let _salesData = null;
+let _salesChartOv = null;
+let _salesChartMo = null;
+
+/* ── Sales: Supabase cloud sync + localStorage offline fallback ─────────────
+   Load  : SALES_EMBEDDED base → overlay localStorage cache → overlay cloud
+   Save  : write to Supabase (daily_sales table) + cache locally
+   Delete: remove from Supabase + remove from cache
+   ─────────────────────────────────────────────────────────────────────────── */
+function getSalesData(){
+  if(_salesData) return _salesData;
+  const map = {};
+  SALES_EMBEDDED.forEach(e => map[e.date] = {...e});
+  const cached = JSON.parse(localStorage.getItem('gt_sales_data')||'null');
+  if(cached) cached.forEach(e => map[e.date] = {...e});
+  _salesData = Object.values(map)
+    .filter(e => e.total_sales||e.ccm||e.cash||e.customers)
+    .sort((a,b) => a.date.localeCompare(b.date));
+  return _salesData;
+}
+
+function _cacheSalesData(){
+  localStorage.setItem('gt_sales_data', JSON.stringify(_salesData));
+}
+
+async function loadSalesFromCloud(){
+  if(!_sbClient) return;
+  try {
+    const { data, error } = await _sbClient
+      .from('daily_sales')
+      .select('*')
+      .order('date', { ascending: true });
+    if(error){
+      // Table doesn't exist yet — not a crash, just use embedded data
+      if(error.code === '42P01' || (error.message && error.message.includes('exist'))){
+        console.info('daily_sales table not set up yet — using embedded data. Run Setup Database Tables in Users & Access.');
+      } else {
+        console.warn('Sales cloud load:', error.message || error.code || 'unknown error');
+      }
+      return; // fall through to embedded/cached data silently
+    }
+    if(data && data.length){
+      const map = {};
+      SALES_EMBEDDED.forEach(e => map[e.date] = {...e});
+      const cached = JSON.parse(localStorage.getItem('gt_sales_data')||'null');
+      if(cached) cached.forEach(e => map[e.date] = {...e});
+      data.forEach(row => {
+        map[row.date] = {
+          date: row.date,
+          total_sales: row.total_sales,
+          ccm: row.ccm,
+          cash: row.cash,
+          customers: row.customers,
+          total_usd: row.total_usd
+        };
+      });
+      _salesData = Object.values(map)
+        .filter(e => e.total_sales||e.ccm||e.cash||e.customers)
+        .sort((a,b) => a.date.localeCompare(b.date));
+      _cacheSalesData();
+    }
+  } catch(e){
+    console.warn('Sales cloud load error:', e && e.message ? e.message : String(e));
+  }
+}
+
+async function syncSalesEntry(entry){
+  if(!_sbClient) return;
+  try {
+    updateSyncBadge('syncing');
+    const { error } = await _sbClient.from('daily_sales').upsert({
+      date:        entry.date,
+      total_sales: entry.total_sales,
+      ccm:         entry.ccm,
+      cash:        entry.cash,
+      customers:   entry.customers,
+      total_usd:   entry.total_usd,
+      updated_at:  new Date().toISOString()
+    }, { onConflict: 'date' });
+    if(error){
+      if(error.code === '42P01' || (error.message && error.message.includes('exist'))){
+        console.info('daily_sales table not set up yet — please run Setup Database Tables.');
+      } else {
+        console.warn('Sales sync:', error.message || error.code);
+      }
+      updateSyncBadge('ready');
+      return;
+    }
+    updateSyncBadge('saved');
+  } catch(e){
+    console.warn('Sales sync error:', e && e.message ? e.message : String(e));
+    updateSyncBadge('ready');
+  }
+}
+
+async function deleteSalesFromCloud(date){
+  if(!_sbClient) return;
+  try {
+    updateSyncBadge('syncing');
+    const { error } = await _sbClient.from('daily_sales').delete().eq('date', date);
+    if(error) throw error;
+    updateSyncBadge('saved');
+  } catch(e){
+    console.error('Sales delete failed:', e);
+    updateSyncBadge('ready');
+  }
+}
+
+function salesUSD(e){ return e.total_usd || ((e.ccm||0)+(e.cash||0)) || 0; }
+function salesFmtUSD(n){ if(!n&&n!==0) return '—'; return '$'+Math.round(n).toLocaleString(); }
+function salesFmtLBP(n){ if(!n) return '—'; return (n/1000000).toFixed(1)+'M'; }
+function salesFmtDate(d){ return new Date(d+'T00:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'}); }
+function salesMonth(d){ return d.slice(0,7); }
+function salesMonthLabel(m){ return new Date(m+'-01').toLocaleDateString('en-GB',{month:'long',year:'numeric'}); }
+
+async function initSalesPage(){
+  _salesData = null; // force reload from cache first, then cloud
+  const isManager = CURRENT_USER && CURRENT_USER.role === 'manager';
+
+  // Show/hide entry form
+  const entrySection = document.getElementById('sales-entry-section');
+  if(entrySection) entrySection.style.display = isManager ? 'block' : 'none';
+
+  // Set today's date in form
+  if(isManager){
+    const today = new Date().toISOString().split('T')[0];
+    const dateEl = document.getElementById('sales-date');
+    if(dateEl) dateEl.value = today;
+  }
+
+  // Update subtitle
+  const sub = document.getElementById('sales-ph-sub');
+  if(sub) sub.textContent = isManager ? 'Good Thing — Sales Entry & Dashboard' : 'Good Thing — Sales Dashboard (View Only)';
+
+  // Render immediately from cache, then refresh from cloud
+  renderSalesStats();
+  renderSalesOverview();
+  renderSalesDaily();
+  renderSalesMonthly();
+
+  // Load from cloud and re-render with fresh data
+  await loadSalesFromCloud();
+  renderSalesStats();
+  renderSalesOverview();
+  renderSalesDaily();
+  renderSalesMonthly();
+}
+
+function salesCalcPreview(){
+  const ccm  = parseFloat(document.getElementById('sales-ccm')?.value)||0;
+  const cash = parseFloat(document.getElementById('sales-cash')?.value)||0;
+  const total = ccm + cash;
+  const pv = document.getElementById('sales-preview');
+  if(!pv) return;
+  if(total > 0){
+    pv.style.display = 'block';
+    pv.textContent = 'Total USD: $' + total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  } else {
+    pv.style.display = 'none';
+  }
+}
+
+function salesSaveEntry(){
+  const date = document.getElementById('sales-date')?.value;
+  if(!date){ toast('Please select a date'); return; }
+  const ccm  = parseFloat(document.getElementById('sales-ccm')?.value)||null;
+  const cash = parseFloat(document.getElementById('sales-cash')?.value)||null;
+  const lbp  = parseFloat(document.getElementById('sales-lbp')?.value)||null;
+  const cust = parseInt(document.getElementById('sales-cust')?.value)||null;
+  const total_usd = (ccm||0)+(cash||0) || null;
+  const entry = { date, total_sales:lbp, ccm, cash, customers:cust, total_usd };
+
+  _salesData = null;
+  const D = getSalesData();
+  const idx = D.findIndex(e=>e.date===date);
+  if(idx>=0) D[idx]=entry; else D.push(entry);
+  D.sort((a,b)=>a.date.localeCompare(b.date));
+  _salesData = D;
+  _cacheSalesData(); // save to localStorage immediately
+  syncSalesEntry(entry); // push to Supabase cloud
+
+  const msg = document.getElementById('sales-save-msg');
+  if(msg){ msg.textContent = '✓ Saved for '+salesFmtDate(date); setTimeout(()=>msg.textContent='',3000); }
+  toast('Sales saved ✓');
+  renderSalesStats();
+  renderSalesOverview();
+  renderSalesDaily();
+  renderSalesMonthly();
+}
+
+function renderSalesStats(){
+  const D = getSalesData();
+  const thisMonth = salesMonth(new Date().toISOString().split('T')[0]);
+  const lastMonthD = new Date(); lastMonthD.setMonth(lastMonthD.getMonth()-1);
+  const lastMonth = salesMonth(lastMonthD.toISOString().split('T')[0]);
+  const mr = D.filter(e=>salesMonth(e.date)===thisMonth);
+  const lr = D.filter(e=>salesMonth(e.date)===lastMonth);
+  const mu = mr.reduce((s,e)=>s+salesUSD(e),0);
+  const lu = lr.reduce((s,e)=>s+salesUSD(e),0);
+  const mc = mr.reduce((s,e)=>s+(e.customers||0),0);
+  const ac = mc>0 ? mu/mc : 0;
+  const el = document.getElementById('sales-stats');
+  if(!el) return;
+  el.innerHTML = `
+    <div class="card"><div class="stat-v" style="color:var(--accent);">${salesFmtUSD(mu)}</div><div class="stat-l">This Month USD</div></div>
+    <div class="card"><div class="stat-v">${salesFmtUSD(lu)}</div><div class="stat-l">Last Month USD</div></div>
+    <div class="card"><div class="stat-v" style="color:var(--accent);">${mc.toLocaleString()}</div><div class="stat-l">Customers MTD</div></div>
+    <div class="card"><div class="stat-v">${ac>0?salesFmtUSD(ac):'—'}</div><div class="stat-l">Avg Check USD</div></div>`;
+}
+
+function renderSalesOverview(){
+  const D = getSalesData();
+  const l30 = D.slice(-30);
+  const recent = D.slice(-10).reverse();
+
+  // Chart
+  if(_salesChartOv){ _salesChartOv.destroy(); _salesChartOv=null; }
+  setTimeout(()=>{
+    const c = document.getElementById('sales-chart-overview');
+    if(!c) return;
+    _salesChartOv = new Chart(c,{
+      type:'bar',
+      data:{
+        labels: l30.map(e=>new Date(e.date+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'})),
+        datasets:[{data:l30.map(e=>salesUSD(e)),backgroundColor:'rgba(192,57,43,0.12)',borderColor:'var(--accent)',borderWidth:1.5,borderRadius:4}]
+      },
+      options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false}},
+        scales:{x:{grid:{display:false},ticks:{font:{size:10},maxRotation:45}},
+                y:{grid:{color:'rgba(0,0,0,0.04)'},ticks:{callback:v=>'$'+Math.round(v).toLocaleString(),font:{size:10}}}}}
+    });
+  },80);
+
+  // Recent table
+  const isManager = CURRENT_USER && CURRENT_USER.role === 'manager';
+  const tbody = document.getElementById('sales-recent-body');
+  if(!tbody) return;
+  tbody.innerHTML = recent.map(e=>{
+    const u=salesUSD(e), av=(e.customers&&u)?'$'+(u/e.customers).toFixed(0):'—';
+    return `<tr>
+      <td>${salesFmtDate(e.date)}</td>
+      <td style="color:var(--muted);">${salesFmtLBP(e.total_sales)}</td>
+      <td style="text-align:right;">${e.ccm!=null?'$'+e.ccm:'—'}</td>
+      <td style="text-align:right;">${e.cash!=null?'$'+e.cash:'—'}</td>
+      <td style="text-align:right;font-family:'Cormorant Garamond',serif;font-size:1rem;color:var(--accent);font-weight:400;">${u>0?salesFmtUSD(u):'—'}</td>
+      <td style="text-align:right;">${e.customers||'—'}</td>
+      <td style="text-align:right;">${av}</td>
+      ${isManager?`<td><button style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:0.75rem;padding:2px 6px;" onclick="salesDeleteEntry('${e.date}')" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">✕</button></td>`:''}
+    </tr>`;
+  }).join('');
+}
+
+function renderSalesDaily(){
+  const D = getSalesData();
+  const sel = document.getElementById('sales-month-filter');
+  // Populate month options
+  if(sel){
+    const months = [...new Set(D.map(e=>salesMonth(e.date)))].sort().reverse();
+    const curVal = sel.value;
+    sel.innerHTML = '<option value="">All months</option>' + months.map(m=>`<option value="${m}"${m===curVal?' selected':''}>${salesMonthLabel(m)}</option>`).join('');
+  }
+  const filterMonth = sel?.value || '';
+  const rows = D.slice().reverse().filter(e=>!filterMonth||salesMonth(e.date)===filterMonth);
+  const totalU = rows.reduce((s,e)=>s+salesUSD(e),0);
+  const totalC = rows.reduce((s,e)=>s+(e.customers||0),0);
+  const isManager = CURRENT_USER && CURRENT_USER.role === 'manager';
+
+  const wrap = document.getElementById('sales-daily-wrap');
+  if(!wrap) return;
+  wrap.innerHTML = `<table>
+    <thead><tr><th>Date</th><th>LBP Total</th><th>CCM USD</th><th>Cash USD</th><th>Total USD</th><th>Customers</th><th>Avg Check</th>${isManager?'<th></th>':''}</tr></thead>
+    <tbody>
+      ${rows.map(e=>{
+        const u=salesUSD(e),av=(e.customers&&u)?'$'+(u/e.customers).toFixed(0):'—';
+        return `<tr>
+          <td>${salesFmtDate(e.date)}</td>
+          <td style="color:var(--muted);">${salesFmtLBP(e.total_sales)}</td>
+          <td style="text-align:right;">${e.ccm!=null?'$'+e.ccm:'—'}</td>
+          <td style="text-align:right;">${e.cash!=null?'$'+e.cash:'—'}</td>
+          <td style="text-align:right;font-family:'Cormorant Garamond',serif;font-size:1rem;color:var(--accent);font-weight:400;">${u>0?salesFmtUSD(u):'—'}</td>
+          <td style="text-align:right;">${e.customers||'—'}</td>
+          <td style="text-align:right;">${av}</td>
+          ${isManager?`<td><button style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:0.75rem;padding:2px 6px;" onclick="salesDeleteEntry('${e.date}')" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">✕</button></td>`:''}
+        </tr>`;
+      }).join('')}
+      <tr style="background:var(--panel2);font-weight:500;">
+        <td colspan="${isManager?4:4}">Total</td>
+        <td style="text-align:right;font-family:'Cormorant Garamond',serif;font-size:1rem;color:var(--accent);">${salesFmtUSD(totalU)}</td>
+        <td style="text-align:right;">${totalC.toLocaleString()}</td>
+        <td></td>${isManager?'<td></td>':''}
+      </tr>
+    </tbody>
+  </table>`;
+}
+
+function renderSalesMonthly(){
+  const D = getSalesData();
+  const bm = {};
+  D.forEach(e=>{
+    const m=salesMonth(e.date);
+    if(!bm[m]) bm[m]={u:0,ca:0,cc:0,cu:0,d:0};
+    const u=salesUSD(e);
+    bm[m].u+=u; bm[m].ca+=(e.cash||0); bm[m].cc+=(e.ccm||0);
+    bm[m].cu+=(e.customers||0); if(u>0)bm[m].d++;
+  });
+  const months = Object.keys(bm).sort().reverse();
+
+  if(_salesChartMo){ _salesChartMo.destroy(); _salesChartMo=null; }
+  setTimeout(()=>{
+    const c=document.getElementById('sales-chart-monthly');
+    if(!c) return;
+    const mths=Object.keys(bm).sort().slice(-12);
+    _salesChartMo = new Chart(c,{
+      type:'bar',
+      data:{
+        labels:mths.map(m=>new Date(m+'-01').toLocaleDateString('en-GB',{month:'short',year:'2-digit'})),
+        datasets:[{data:mths.map(m=>bm[m].u),backgroundColor:'rgba(192,57,43,0.12)',borderColor:'var(--accent)',borderWidth:1.5,borderRadius:5}]
+      },
+      options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false}},
+        scales:{x:{grid:{display:false},ticks:{font:{size:10}}},
+                y:{grid:{color:'rgba(0,0,0,0.04)'},ticks:{callback:v=>'$'+Math.round(v).toLocaleString(),font:{size:10}}}}}
+    });
+  },80);
+
+  const tbody = document.getElementById('sales-monthly-body');
+  if(!tbody) return;
+  tbody.innerHTML = months.map(m=>{
+    const d=bm[m],av=d.d>0?'$'+(d.u/d.d).toFixed(0):'—',ch=d.cu>0?'$'+(d.u/d.cu).toFixed(0):'—';
+    return `<tr>
+      <td style="font-weight:400;">${salesMonthLabel(m)}</td>
+      <td style="text-align:right;font-family:'Cormorant Garamond',serif;font-size:1rem;color:var(--accent);font-weight:400;">${salesFmtUSD(d.u)}</td>
+      <td style="text-align:right;">${salesFmtUSD(d.cc)}</td>
+      <td style="text-align:right;">${salesFmtUSD(d.ca)}</td>
+      <td style="text-align:right;">${d.cu.toLocaleString()}</td>
+      <td style="text-align:right;">${av}</td>
+      <td style="text-align:right;">${ch}</td>
+    </tr>`;
+  }).join('');
+}
+
+function salesDeleteEntry(date){
+  if(!confirm('Delete sales entry for '+salesFmtDate(date)+'?')) return;
+  _salesData = getSalesData().filter(e=>e.date!==date);
+  _cacheSalesData(); // update localStorage
+  deleteSalesFromCloud(date); // remove from Supabase
+  renderSalesStats(); renderSalesOverview(); renderSalesDaily(); renderSalesMonthly();
+  toast('Entry deleted');
+}
+
+/* ─ End of Day (Sales) ─ */
+function openSalesEndOfDay(){
+  document.getElementById('sales-eod-modal').classList.add('open');
+}
+function confirmSalesEndOfDay(){
+  document.getElementById('sales-eod-modal').classList.remove('open');
+  // Clear today's entry form
+  ['sales-lbp','sales-ccm','sales-cash','sales-cust'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.value='';
+  });
+  const pv=document.getElementById('sales-preview');
+  if(pv) pv.style.display='none';
+  const msg=document.getElementById('sales-save-msg');
+  if(msg) msg.textContent='';
+  toast('Sales day closed — form reset ✓');
+}
+
+/* ─ WhatsApp share ─ */
+function openSalesWhatsApp(){
+  const D = getSalesData();
+  const today = new Date().toISOString().split('T')[0];
+  const entry = D.find(e=>e.date===today);
+  const thisMonth = salesMonth(today);
+  const mr = D.filter(e=>salesMonth(e.date)===thisMonth);
+  const mu = mr.reduce((s,e)=>s+salesUSD(e),0);
+  const mc = mr.reduce((s,e)=>s+(e.customers||0),0);
+
+  let lines = [`📊 *Good Thing — Daily Sales Report*\n📅 ${salesFmtDate(today)}\n`];
+  if(entry){
+    const u = salesUSD(entry);
+    lines.push(`*Today's Figures*`);
+    if(entry.total_sales) lines.push(`• LBP Total: ${salesFmtLBP(entry.total_sales)} LL`);
+    if(entry.ccm!=null)   lines.push(`• CCM:  $${entry.ccm}`);
+    if(entry.cash!=null)  lines.push(`• Cash: $${entry.cash}`);
+    if(u>0)               lines.push(`• *Total USD: ${salesFmtUSD(u)}*`);
+    if(entry.customers)   lines.push(`• Customers: ${entry.customers}`);
+  } else {
+    lines.push(`_No entry logged for today yet._`);
+  }
+  lines.push(`\n*Month to Date (${new Date(thisMonth+'-01').toLocaleDateString('en-GB',{month:'long',year:'numeric'})})*`);
+  lines.push(`• Revenue: *${salesFmtUSD(mu)}*`);
+  lines.push(`• Days logged: ${mr.length}`);
+  lines.push(`• Customers: ${mc.toLocaleString()}`);
+  lines.push(`\n_Good Thing Restaurant_`);
+
+  document.getElementById('sales-wa-preview').textContent = lines.join('\n');
+  // Pre-fill saved number
+  const saved = localStorage.getItem('sales-wa-number')||'';
+  document.getElementById('sales-wa-num').value = saved;
+  document.getElementById('sales-wa-modal').classList.add('open');
+}
+function doSalesWhatsApp(){
+  const num = document.getElementById('sales-wa-num').value.replace(/\s+/g,'').replace(/[^+\d]/g,'').replace('+','');
+  const text = document.getElementById('sales-wa-preview').textContent;
+  if(num) localStorage.setItem('sales-wa-number', '+'+num);
+  const url = num ? `https://wa.me/${num}?text=${encodeURIComponent(text)}` : `https://wa.me/?text=${encodeURIComponent(text)}`;
+  window.open(url,'_blank');
+  document.getElementById('sales-wa-modal').classList.remove('open');
+}
+</script>
+</body>
+</html>
